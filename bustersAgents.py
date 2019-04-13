@@ -16,7 +16,6 @@ import util
 from game import Agent
 from game import Directions
 from keyboardAgents import KeyboardAgent
-from wekaI import Weka
 import inference
 import busters
 import os
@@ -742,3 +741,205 @@ class BasicAgentAA(BustersAgent):
             file.write("@ATTRIBUTE %s %s\n" % (l[0], l[1]))
         # Escribimos el indicador de que empiezan los datos
         file.write("\n@data\n")
+
+class QLearningAgent(BustersAgent):
+
+    def registerInitialState(self, gameState):
+        BustersAgent.registerInitialState(self, gameState)
+        self.distancer = Distancer(gameState.data.layout, False)
+        self.countActions = 0
+
+    def __init__(self, **args):
+        "Initialize Q-values"
+
+        self.table_file = open("qtable.txt", "r+")
+        self.q_table = self.readQtable()
+        self.epsilon = 0.05
+        self.last_score = 0
+
+    def registerInitialState(self, gameState):
+        BustersAgent.registerInitialState(self, gameState)
+        self.distancer = Distancer(gameState.data.layout, False)
+        self.countActions = 0
+    
+    def readQtable(self):
+        "Read qtable from disc"
+        table = self.table_file.readlines()
+        q_table = []
+
+        for i, line in enumerate(table):
+            row = line.split()
+            row = [float(x) for x in row]
+            q_table.append(row)
+
+        return q_table
+
+    def writeQtable(self):
+        "Write qtable to disc"
+        self.table_file.seek(0)
+        self.table_file.truncate()
+
+        for line in self.q_table:
+            for item in line:
+                self.table_file.write(str(item)+" ")
+            self.table_file.write("\n")
+
+    def computePosition(self, state):
+
+        return self.getNumberAction(state[0])
+
+
+    def getNumberAction(self, action):
+        if action == 'north':
+            action = 0
+        elif action == 'east':
+            action = 1
+        elif action == 'south':
+            action = 2
+        elif action == 'west':
+            action = 3
+        return action
+
+    def chooseAction(self, state):
+        legal = gameState.getLegalActions(0)
+
+        flip = util.flipCoin(self.epsilon)
+
+        if flip:
+            return random.choice(legal)
+        return self.computeActionFromQValues(state)
+
+    def computeActionFromQValues(self, state):
+
+        legal = self.getLegalActions(0)
+
+        best_actions = [legal]
+        best_value = self.getQValue(state, legal)
+        for action in legal:
+            value = self.getQValue(state, action)
+            if value == best_value:
+                best_actions.append(action)
+            if value > best_value:
+                best_actions = [action]
+                best_value = value
+
+        return random.choice(best_actions)
+
+    def getQValue(self, state, action):
+
+        position = self.computePosition(state)
+        action_column = self.getNumberAction[action]
+
+        return self.q_table[position][action_column]
+
+    def update(self, gameState, state, action, nextState, reward):
+        pos = self.computePosition(state)
+
+        action = self.getNumberAction(self.chooseAction(state))
+
+    def getState(self, gameState):
+        # Por defecto, el movimiento a ejecutar es "Stop"
+        bestMove = Directions.STOP
+        # Almacenamos en variables una serie de datos relevantes
+        legal = gameState.getLegalActions(0) ##Legal position from the pacman
+        posPacman = gameState.getPacmanPosition()
+        minDist = 99999
+        walls = gameState.getWalls()
+        livingGhosts = gameState.getLivingGhosts()
+        #move NORTH
+        if Directions.NORTH in legal:
+            # Inicia un contador a 1 para no tener el cuenta el pacman
+            iterator = 1
+            # Almacena la posicion del pacman resultante de ejecutar la accion
+            buffPacman = posPacman[0], posPacman[1] + 1
+            # Comprueba que la casilla objetivo no contenga un muro
+            if walls[buffPacman[0]][buffPacman[1]] == False:
+                if gameState.getDistanceNearestFood() != None:
+                    foodPos = gameState.getPositionNearestFood(buffPacman)
+                    if self.distancer.getDistance(foodPos, buffPacman) < minDist:
+                        minDist = self.distancer.getDistance(foodPos, buffPacman)
+                        bestMove = Directions.NORTH
+                else:
+                    # Itera sobre los fantasmas
+                    for x in gameState.getGhostPositions():
+                        # Comprueba que los fantasmas estan vivos
+                        if livingGhosts[iterator] == True:
+                            # Se comprueba si la distancia es menor que la minima de todas las acciones
+                            if self.distancer.getDistance(x, buffPacman) < minDist:
+                                # Se sobreescribe y se cambia el movimiento a realizar
+                                minDist = self.distancer.getDistance(x, buffPacman)
+                                bestMove = Directions.NORTH
+                        iterator = iterator + 1
+        #move SOUTH
+        if Directions.SOUTH in legal:
+            # Inicia un contador a 1 para no tener el cuenta el pacman
+            iterator = 1
+            # Almacena la posicion del pacman resultante de ejecutar la accion
+            buffPacman = posPacman[0], posPacman[1] - 1
+            # Comprueba que la casilla objetivo no contenga un muro
+            if walls[buffPacman[0]][buffPacman[1]] == False:
+                if gameState.getDistanceNearestFood() != None:
+                    foodPos = gameState.getPositionNearestFood(buffPacman)
+                    if self.distancer.getDistance(foodPos, buffPacman) < minDist:
+                        minDist = self.distancer.getDistance(foodPos, buffPacman)
+                        bestMove = Directions.SOUTH
+                else:
+                    # Itera sobre los fantasmas
+                    for x in gameState.getGhostPositions():
+                        # Comprueba que los fantasmas estan vivos
+                        if livingGhosts[iterator] == True:
+                            # Se comprueba si la distancia es menor que la minima de todas las acciones
+                            if self.distancer.getDistance(x, buffPacman) < minDist:
+                                # Se sobreescribe y se cambia el movimiento a realizar
+                                minDist = self.distancer.getDistance(x, buffPacman)
+                                bestMove = Directions.SOUTH
+                        iterator = iterator + 1
+        #move EAST
+        if Directions.EAST in legal:
+            # Inicia un contador a 1 para no tener el cuenta el pacman
+            iterator = 1
+            # Almacena la posicion del pacman resultante de ejecutar la accion
+            buffPacman = posPacman[0] + 1, posPacman[1]
+            # Comprueba que la casilla objetivo no contenga un muro
+            if walls[buffPacman[0]][buffPacman[1]] == False:
+                if gameState.getDistanceNearestFood() != None:
+                    foodPos = gameState.getPositionNearestFood(buffPacman)
+                    if self.distancer.getDistance(foodPos, buffPacman) < minDist:
+                        minDist = self.distancer.getDistance(foodPos, buffPacman)
+                        bestMove = Directions.EAST
+                else:
+                    # Itera sobre los fantasmas
+                    for x in gameState.getGhostPositions():
+                        # Comprueba que los fantasmas estan vivos
+                        if livingGhosts[iterator] == True:
+                            # Se comprueba si la distancia es menor que la minima de todas las acciones
+                            if self.distancer.getDistance(x, buffPacman) < minDist:
+                                # Se sobreescribe y se cambia el movimiento a realizar
+                                minDist = self.distancer.getDistance(x, buffPacman)
+                                bestMove = Directions.EAST
+                        iterator = iterator + 1
+        #move WEST
+        if Directions.WEST in legal:
+            # Inicia un contador a 1 para no tener el cuenta el pacman
+            iterator = 1
+            # Almacena la posicion del pacman resultante de ejecutar la accion
+            buffPacman = posPacman[0] - 1, posPacman[1]
+            # Comprueba que la casilla objetivo no contenga un muro
+            if walls[buffPacman[0]][buffPacman[1]] == False:
+                if gameState.getDistanceNearestFood() != None:
+                    foodPos = gameState.getPositionNearestFood(buffPacman)
+                    if self.distancer.getDistance(foodPos, buffPacman) < minDist:
+                        minDist = self.distancer.getDistance(foodPos, buffPacman)
+                        bestMove = Directions.WEST
+                else:
+                    # Itera sobre los fantasmas
+                    for x in gameState.getGhostPositions():
+                        # Comprueba que los fantasmas estan vivos
+                        if livingGhosts[iterator] == True:
+                            # Se comprueba si la distancia es menor que la minima de todas las acciones
+                            if self.distancer.getDistance(x, buffPacman) < minDist:
+                                # Se sobreescribe y se cambia el movimiento a realizar
+                                minDist = self.distancer.getDistance(x, buffPacman)
+                                bestMove = Directions.WEST
+                        iterator = iterator + 1
+        state = bestMove
