@@ -12,10 +12,10 @@
 # Pieter Abbeel (pabbeel@cs.berkeley.edu).
 
 
-import util
-from game import Agent
-from game import Directions
+import util, random, math
+from game import *
 from keyboardAgents import KeyboardAgent
+from learningAgents import ReinforcementAgent
 import inference
 import busters
 import os
@@ -742,23 +742,20 @@ class BasicAgentAA(BustersAgent):
         # Escribimos el indicador de que empiezan los datos
         file.write("\n@data\n")
 
-class QLearningAgent(BustersAgent):
-
-    def registerInitialState(self, gameState):
-        BustersAgent.registerInitialState(self, gameState)
-        self.distancer = Distancer(gameState.data.layout, False)
-        self.countActions = 0
+class QLearningAgent(ReinforcementAgent):
 
     def __init__(self, **args):
         "Initialize Q-values"
 
+        ReinforcementAgent.__init__(self)
         self.table_file = open("qtable.txt", "r+")
         self.q_table = self.readQtable()
         self.epsilon = 0.05
         self.last_score = 0
-
+        self.episodesSoFar = 0
+    
     def registerInitialState(self, gameState):
-        BustersAgent.registerInitialState(self, gameState)
+        ReinforcementAgent.registerInitialState(self, gameState)
         self.distancer = Distancer(gameState.data.layout, False)
         self.countActions = 0
     
@@ -836,6 +833,17 @@ class QLearningAgent(BustersAgent):
         pos = self.computePosition(state)
 
         action = self.getNumberAction(self.chooseAction(state))
+
+    def final(self, state):
+        "Called at the end of each game."
+        # call the super-class final method
+        PacmanQAgent.final(self, state)
+
+        # did we finish training?
+        if self.episodesSoFar == self.numTraining:
+            # you might want to print your weights here for debugging
+            "*** YOUR CODE HERE ***"
+            pass
 
     def getState(self, gameState):
         # Por defecto, el movimiento a ejecutar es "Stop"
@@ -943,3 +951,4 @@ class QLearningAgent(BustersAgent):
                                 bestMove = Directions.WEST
                         iterator = iterator + 1
         state = bestMove
+

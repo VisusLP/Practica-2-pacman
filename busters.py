@@ -28,7 +28,6 @@ from game import Configuration
 from util import nearestPoint
 from util import manhattanDistance
 import sys, util, types, time, random, layout, os
-from wekaI import Weka
 
 layoutName = ''
 

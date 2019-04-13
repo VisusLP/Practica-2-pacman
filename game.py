@@ -23,7 +23,6 @@ from util import *
 import time, os
 import traceback
 import sys
-from wekaI import Weka
 
 
 #######################
