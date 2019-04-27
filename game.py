@@ -342,7 +342,8 @@ class Actions:
             dx, dy = vec
             next_y = y_int + dy
             next_x = x_int + dx
-            if not walls[next_x][next_y]: possible.append(dir)
+            if not walls[next_x][next_y] and dir != 'Stop':
+                possible.append(dir)
 
         return possible
 
@@ -719,6 +720,8 @@ class Game:
 
             if _BOINC_ENABLED:
                 boinc.set_fraction_done(self.getProgress())
+            if agentIndex == 1:
+                agent.getUpdate(observation, action)
 
         # inform a learning agent of the game result
         for agentIndex, agent in enumerate(self.agents):
@@ -733,6 +736,3 @@ class Game:
                     self.unmute()
                     return
         self.display.finish()
-        # Estas lineas sirven para cerrar Weka al terminar una partida, y asi poder introducir mas comandos
-        self.weka = Weka()
-        self.weka.stop_jvm()

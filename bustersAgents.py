@@ -20,13 +20,10 @@ import inference
 import busters
 import os
 
-last_move = "Stop"
-prevState = []
-predictN = 1
-distWest = 0
-distEast = 0
-distNorth = 0
-distSouth = 0
+last_action = random.choice(['North','South','East','West'])
+state = []
+last_score = 0
+q_table = []
 
 class NullGraphics:
     "Placeholder for graphics"
@@ -147,6 +144,7 @@ class BustersKeyboardAgent(BustersAgent, KeyboardAgent):
 
         # Almacenamos en variables una serie de datos utiles
         legal = gameState.getLegalActions(0) ##Legal position from the pacman
+        
         posPacman = gameState.getPacmanPosition()
         walls = gameState.getWalls()
         livingGhosts = gameState.getLivingGhosts()
@@ -575,6 +573,7 @@ class BasicAgentAA(BustersAgent):
         
         # Almacenamos en variables una serie de datos utiles
         legal = gameState.getLegalActions(0) ##Legal position from the pacman
+        
         posPacman = gameState.getPacmanPosition()
         walls = gameState.getWalls()
         livingGhosts = gameState.getLivingGhosts()
@@ -742,17 +741,77 @@ class BasicAgentAA(BustersAgent):
         # Escribimos el indicador de que empiezan los datos
         file.write("\n@data\n")
 
-class QLearningAgent(ReinforcementAgent):
+class ReinforcementAgent:
+    global last_action
+    global last_score
+    global state
+    global q_table
 
-    def __init__(self, **args):
-        "Initialize Q-values"
-
-        ReinforcementAgent.__init__(self)
+    def __init__( self, index = 0, inference = "ExactInference", ghostAgents = None, observeEnable = True, elapseTimeEnable = True, discount = 0.8):
+        inferenceType = util.lookup(inference, globals())
+        self.inferenceModules = [inferenceType(a) for a in ghostAgents]
+        self.observeEnable = observeEnable
+        self.elapseTimeEnable = elapseTimeEnable
+        global last_action
+        global q_table
         self.table_file = open("qtable.txt", "r+")
         self.q_table = self.readQtable()
         self.epsilon = 0.05
         self.last_score = 0
+        self.last_action = random.choice(['North','South','East','West'])
+        self.state = []
         self.episodesSoFar = 0
+        self.alpha = 0.2
+        self.discount = float(discount)
+        
+    def registerInitialState(self, gameState):
+        "Initializes beliefs and inference modules"
+        import __main__
+        self.display = __main__._display
+        for inference in self.inferenceModules:
+            inference.initialize(gameState)
+        self.ghostBeliefs = [inf.getBeliefDistribution() for inf in self.inferenceModules]
+        self.firstMove = True
+
+    def observationFunction(self, gameState):
+        "Removes the ghost states from the gameState"
+        agents = gameState.data.agentStates
+        gameState.data.agentStates = [agents[0]] + [None for i in range(1, len(agents))]
+        return gameState
+
+    def getAction(self, gameState):
+        "Updates beliefs, then chooses an action based on updated beliefs."
+        #for index, inf in enumerate(self.inferenceModules):
+        #    if not self.firstMove and self.elapseTimeEnable:
+        #        inf.elapseTime(gameState)
+        #    self.firstMove = False
+        #    if self.observeEnable:
+        #        inf.observeState(gameState)
+        #    self.ghostBeliefs[index] = inf.getBeliefDistribution()
+        #self.display.updateDistributions(self.ghostBeliefs)
+        posPacman = gameState.getPacmanPosition()
+        state = self.getState(gameState, posPacman)
+        return self.chooseAction(state, gameState)
+
+    def chooseAction(self, state, gameState):
+        "By default, a BustersAgent just stops.  This should be overridden."
+        last_action = self.chooseAction(state, gameState)
+        return last_action
+
+    def getUpdate(self, gameState, action):
+
+        reward = (gameState.getScore() - self.last_score) / 100000
+
+        posPacman = gameState.getPacmanPosition()
+        state = self.getState(gameState, posPacman)
+
+        posPacman = self.getPacmanPosition(posPacman, last_action)
+        
+        nextState = self.getState(gameState, posPacman)
+
+        return self.update(gameState, state, action, nextState, reward)
+
+class QLearningAgent(ReinforcementAgent):
     
     def registerInitialState(self, gameState):
         ReinforcementAgent.registerInitialState(self, gameState)
@@ -783,35 +842,37 @@ class QLearningAgent(ReinforcementAgent):
 
     def computePosition(self, state):
 
-        return self.getNumberAction(state[0])
+        return self.getNumberAction(state)
 
 
     def getNumberAction(self, action):
-        if action == 'north':
+        if action == 'North':
             action = 0
-        elif action == 'east':
+        elif action == 'East':
             action = 1
-        elif action == 'south':
+        elif action == 'South':
             action = 2
-        elif action == 'west':
+        elif action == 'West':
             action = 3
         return action
 
-    def chooseAction(self, state):
+    def chooseAction(self, state, gameState):
         legal = gameState.getLegalActions(0)
+        
 
         flip = util.flipCoin(self.epsilon)
 
         if flip:
             return random.choice(legal)
-        return self.computeActionFromQValues(state)
+        return self.computeActionFromQValues(state, gameState)
 
-    def computeActionFromQValues(self, state):
+    def computeActionFromQValues(self, state, gameState):
 
-        legal = self.getLegalActions(0)
+        legal = gameState.getLegalActions(0)
+        
 
-        best_actions = [legal]
-        best_value = self.getQValue(state, legal)
+        best_actions = []
+        best_value = -99999
         for action in legal:
             value = self.getQValue(state, action)
             if value == best_value:
@@ -822,35 +883,66 @@ class QLearningAgent(ReinforcementAgent):
 
         return random.choice(best_actions)
 
+    def computeValueFromQValues(self, state, gameState):
+        """
+          Returns max_action Q(state,action)
+          where the max is over legal actions.  Note that if
+          there are no legal actions, which is the case at the
+          terminal state, you should return a value of 0.0.
+        """
+        legalActions = gameState.getLegalActions(0)
+        if len(legalActions)==0:
+          return 0
+        return max(self.q_table[self.computePosition(state)])
+
     def getQValue(self, state, action):
 
         position = self.computePosition(state)
-        action_column = self.getNumberAction[action]
+        
+        action_column = self.getNumberAction(action)
 
         return self.q_table[position][action_column]
 
     def update(self, gameState, state, action, nextState, reward):
         pos = self.computePosition(state)
 
-        action = self.getNumberAction(self.chooseAction(state))
+        action = self.getNumberAction(self.chooseAction(state, gameState))
 
-    def final(self, state):
-        "Called at the end of each game."
-        # call the super-class final method
-        PacmanQAgent.final(self, state)
+        if  gameState.getNumAgents() -1 == 0:
+            q_value = ((1 - self.alpha) * self.q_table[pos][action]) + (self.alpha * reward)
+        else:
+            # Se busca la posicion del proximo estado con computePosition()
+            posNext = self.computePosition(nextState)
+            # Obtenemos el mejor Q-value del estado actual, lo que determina la mejor accion.
+            max_a = self.computeValueFromQValues(nextState, gameState)
+            # Por ultimo, calculamos la siguiente accion, y su numero equivalente
+            nextAction = self.computeActionFromQValues(nextState, gameState)
+            nextAction = self.getNumberAction(nextAction)
+            # Se calcula el q-value actual con la siguiente formula
+            q_value = (1 - self.alpha) * self.q_table[pos][action] + (self.alpha * (reward + (self.discount * max_a * self.q_table[posNext][nextAction])))
+        # Actualizamos la tabla de Q-values
+        self.q_table[pos][action] = q_value
+        # Escribimos los cambios en el archivo
+        self.writeQtable()
 
-        # did we finish training?
-        if self.episodesSoFar == self.numTraining:
-            # you might want to print your weights here for debugging
-            "*** YOUR CODE HERE ***"
-            pass
+    def getPacmanPosition(self, posPacman, action):
+        buffPacman = 0,0
+        if action == 'North':
+            buffPacman = posPacman[0], posPacman[1] + 1
+        elif action == 'South':
+            buffPacman = posPacman[0], posPacman[1] - 1
+        elif action == "East":
+            buffPacman = posPacman[0] + 1, posPacman[1]
+        elif action == "West":
+            buffPacman = posPacman[0] - 1, posPacman[1]
+        return buffPacman
 
-    def getState(self, gameState):
-        # Por defecto, el movimiento a ejecutar es "Stop"
-        bestMove = Directions.STOP
+    def getState(self, gameState, posPacman):
         # Almacenamos en variables una serie de datos relevantes
         legal = gameState.getLegalActions(0) ##Legal position from the pacman
-        posPacman = gameState.getPacmanPosition()
+        # Por defecto, el movimiento a ejecutar es "Stop"
+        bestMove = random.choice(legal)
+        
         minDist = 99999
         walls = gameState.getWalls()
         livingGhosts = gameState.getLivingGhosts()
@@ -951,4 +1043,5 @@ class QLearningAgent(ReinforcementAgent):
                                 bestMove = Directions.WEST
                         iterator = iterator + 1
         state = bestMove
+        return state
 

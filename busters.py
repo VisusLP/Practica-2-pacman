@@ -362,7 +362,7 @@ class BustersGameRules:
     and how the game starts and ends.
     """
 
-    def newGame( self, layout, pacmanAgent, ghostAgents, display, maxMoves= 300 ):
+    def newGame( self, layout, pacmanAgent, ghostAgents, display, maxMoves= -1 ):
         agents = [pacmanAgent] + ghostAgents
         initState = GameState()
         initState.initialize( layout, len(ghostAgents))
@@ -423,6 +423,7 @@ class GhostRules:
 
     def applyAction( state, action, ghostIndex):
         legal = GhostRules.getLegalActions( state, ghostIndex )
+        legal.append('Stop')
         if action not in legal:
             raise Exception("Illegal ghost action: " + str(action))
 
@@ -608,7 +609,7 @@ def loadAgent(pacman, nographics):
                 return getattr(module, pacman)
     raise Exception('The agent ' + pacman + ' is not specified in any *Agents.py.')
 
-def runGames( layout, pacman, ghosts, display, numGames, maxMoves=300):
+def runGames( layout, pacman, ghosts, display, numGames, maxMoves=-1):
     # Hack for agents writing to the display
     import __main__
     __main__.__dict__['_display'] = display
