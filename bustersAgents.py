@@ -756,7 +756,7 @@ class ReinforcementAgent:
         global q_table
         self.table_file = open("qtable.txt", "r+")
         self.q_table = self.readQtable()
-        self.epsilon = 0.05
+        self.epsilon = 0.2
         self.last_score = 0
         self.last_action = random.choice(['North','South','East','West'])
         self.state = []
@@ -809,6 +809,9 @@ class ReinforcementAgent:
         
         nextState = self.getState(gameState, posPacman)
 
+        # if (self.alpha > 0.05):
+        #     self.alpha -= 0.01
+
         return self.update(gameState, state, action, nextState, reward)
 
 class QLearningAgent(ReinforcementAgent):
@@ -841,9 +844,8 @@ class QLearningAgent(ReinforcementAgent):
             self.table_file.write("\n")
 
     def computePosition(self, state):
-
-        return self.getNumberAction(state)
-
+        pos = state[0][1] + state[1][1]*4 + state[2][1]*16 + state[3][1]*64
+        return pos
 
     def getNumberAction(self, action):
         if action == 'North':
@@ -937,12 +939,26 @@ class QLearningAgent(ReinforcementAgent):
             buffPacman = posPacman[0] - 1, posPacman[1]
         return buffPacman
 
+    def getFuzzyDistance(self, distance):
+        if distance < 5:
+            return ['short', 0]
+        elif distance < 12:
+            return ['medium', 1]
+        elif distance < 70:
+            return ['long', 2]
+        else:
+            return ['illegal', 3]
+
     def getState(self, gameState, posPacman):
         # Almacenamos en variables una serie de datos relevantes
         legal = gameState.getLegalActions(0) ##Legal position from the pacman
         # Por defecto, el movimiento a ejecutar es "Stop"
         bestMove = random.choice(legal)
-        
+        distNorth = 99999
+        distSouth = 99999
+        distEast = 99999
+        distWest = 99999
+
         minDist = 99999
         walls = gameState.getWalls()
         livingGhosts = gameState.getLivingGhosts()
@@ -956,19 +972,22 @@ class QLearningAgent(ReinforcementAgent):
             if walls[buffPacman[0]][buffPacman[1]] == False:
                 if gameState.getDistanceNearestFood() != None:
                     foodPos = gameState.getPositionNearestFood(buffPacman)
-                    if self.distancer.getDistance(foodPos, buffPacman) < minDist:
-                        minDist = self.distancer.getDistance(foodPos, buffPacman)
-                        bestMove = Directions.NORTH
+                    if self.distancer.getDistance(foodPos, buffPacman) < distNorth:
+                        distNorth = self.distancer.getDistance(foodPos, buffPacman)
+                        if distNorth < minDist:
+                            minDist = distNorth
+                            bestMove = Directions.NORTH
                 else:
                     # Itera sobre los fantasmas
                     for x in gameState.getGhostPositions():
                         # Comprueba que los fantasmas estan vivos
                         if livingGhosts[iterator] == True:
                             # Se comprueba si la distancia es menor que la minima de todas las acciones
-                            if self.distancer.getDistance(x, buffPacman) < minDist:
-                                # Se sobreescribe y se cambia el movimiento a realizar
-                                minDist = self.distancer.getDistance(x, buffPacman)
-                                bestMove = Directions.NORTH
+                            if self.distancer.getDistance(x, buffPacman) < distNorth:
+                                distNorth = self.distancer.getDistance(x, buffPacman)
+                                if distNorth < minDist:
+                                    minDist = distNorth
+                                    bestMove = Directions.NORTH
                         iterator = iterator + 1
         #move SOUTH
         if Directions.SOUTH in legal:
@@ -980,19 +999,23 @@ class QLearningAgent(ReinforcementAgent):
             if walls[buffPacman[0]][buffPacman[1]] == False:
                 if gameState.getDistanceNearestFood() != None:
                     foodPos = gameState.getPositionNearestFood(buffPacman)
-                    if self.distancer.getDistance(foodPos, buffPacman) < minDist:
-                        minDist = self.distancer.getDistance(foodPos, buffPacman)
-                        bestMove = Directions.SOUTH
+                    if self.distancer.getDistance(foodPos, buffPacman) < distSouth:
+                        distSouth = self.distancer.getDistance(foodPos, buffPacman)
+                        if distSouth < minDist:
+                            minDist = distSouth
+                            bestMove = Directions.SOUTH
                 else:
                     # Itera sobre los fantasmas
                     for x in gameState.getGhostPositions():
                         # Comprueba que los fantasmas estan vivos
                         if livingGhosts[iterator] == True:
                             # Se comprueba si la distancia es menor que la minima de todas las acciones
-                            if self.distancer.getDistance(x, buffPacman) < minDist:
-                                # Se sobreescribe y se cambia el movimiento a realizar
-                                minDist = self.distancer.getDistance(x, buffPacman)
-                                bestMove = Directions.SOUTH
+                            if self.distancer.getDistance(x, buffPacman) < distSouth:
+                                distSouth = self.distancer.getDistance(x, buffPacman)
+                                if distSouth < minDist:
+                                    # Se sobreescribe y se cambia el movimiento a realizar
+                                    minDist = distSouth
+                                    bestMove = Directions.SOUTH
                         iterator = iterator + 1
         #move EAST
         if Directions.EAST in legal:
@@ -1004,19 +1027,23 @@ class QLearningAgent(ReinforcementAgent):
             if walls[buffPacman[0]][buffPacman[1]] == False:
                 if gameState.getDistanceNearestFood() != None:
                     foodPos = gameState.getPositionNearestFood(buffPacman)
-                    if self.distancer.getDistance(foodPos, buffPacman) < minDist:
-                        minDist = self.distancer.getDistance(foodPos, buffPacman)
-                        bestMove = Directions.EAST
+                    if self.distancer.getDistance(foodPos, buffPacman) < distEast:
+                        distEast = self.distancer.getDistance(foodPos, buffPacman)
+                        if distEast < minDist:
+                            minDist = distEast
+                            bestMove = Directions.EAST
                 else:
                     # Itera sobre los fantasmas
                     for x in gameState.getGhostPositions():
                         # Comprueba que los fantasmas estan vivos
                         if livingGhosts[iterator] == True:
                             # Se comprueba si la distancia es menor que la minima de todas las acciones
-                            if self.distancer.getDistance(x, buffPacman) < minDist:
-                                # Se sobreescribe y se cambia el movimiento a realizar
-                                minDist = self.distancer.getDistance(x, buffPacman)
-                                bestMove = Directions.EAST
+                            if self.distancer.getDistance(x, buffPacman) < distEast:
+                                distEast = self.distancer.getDistance(x, buffPacman)
+                                if distEast < minDist:
+                                    # Se sobreescribe y se cambia el movimiento a realizar
+                                    minDist = distEast
+                                    bestMove = Directions.EAST
                         iterator = iterator + 1
         #move WEST
         if Directions.WEST in legal:
@@ -1028,20 +1055,31 @@ class QLearningAgent(ReinforcementAgent):
             if walls[buffPacman[0]][buffPacman[1]] == False:
                 if gameState.getDistanceNearestFood() != None:
                     foodPos = gameState.getPositionNearestFood(buffPacman)
-                    if self.distancer.getDistance(foodPos, buffPacman) < minDist:
-                        minDist = self.distancer.getDistance(foodPos, buffPacman)
-                        bestMove = Directions.WEST
+                    if self.distancer.getDistance(foodPos, buffPacman) < distWest:
+                        distWest = self.distancer.getDistance(foodPos, buffPacman)
+                        if distWest < minDist:
+                            minDist = distWest
+                            bestMove = Directions.WEST
                 else:
                     # Itera sobre los fantasmas
                     for x in gameState.getGhostPositions():
                         # Comprueba que los fantasmas estan vivos
                         if livingGhosts[iterator] == True:
                             # Se comprueba si la distancia es menor que la minima de todas las acciones
-                            if self.distancer.getDistance(x, buffPacman) < minDist:
-                                # Se sobreescribe y se cambia el movimiento a realizar
-                                minDist = self.distancer.getDistance(x, buffPacman)
-                                bestMove = Directions.WEST
+                            if self.distancer.getDistance(x, buffPacman) < distWest:
+                                distWest = self.distancer.getDistance(x, buffPacman)
+                                if distWest < minDist:
+                                    # Se sobreescribe y se cambia el movimiento a realizar
+                                    minDist = distWest
+                                    bestMove = Directions.WEST
                         iterator = iterator + 1
-        state = bestMove
+
+
+        distNorth = self.getFuzzyDistance(distNorth)
+        distSouth = self.getFuzzyDistance(distSouth)
+        distEast = self.getFuzzyDistance(distEast)
+        distWest = self.getFuzzyDistance(distWest)
+        state = distNorth, distSouth, distEast, distWest
+
         return state
 
