@@ -564,7 +564,7 @@ class Game:
         sys.stdout = OLD_STDOUT
         sys.stderr = OLD_STDERR
 
-    def run( self ):
+    def run( self, episodesSoFar, numGames, numTraining):
         """
         Main control loop for game play.
         """
@@ -728,7 +728,7 @@ class Game:
             if "final" in dir( agent ) :
                 try:
                     self.mute(agentIndex)
-                    agent.final( self.state )
+                    agent.final( self.state, episodesSoFar, numGames, numTraining )
                     self.unmute()
                 except Exception,data:
                     if not self.catchExceptions: raise

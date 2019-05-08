@@ -267,7 +267,12 @@ class GameState:
         self.livingGhosts[index] = False
 
     def isLose( self ):
-        return self.maxMoves > 0 and self.numMoves >= self.maxMoves
+        if self.maxMoves > 0 and self.numMoves >= self.maxMoves:
+            return True
+        if self.getScore() <= -500:
+            return True
+        else: 
+            return False
 
     def getNumMoves(self):
         return self.numMoves
@@ -362,13 +367,16 @@ class BustersGameRules:
     and how the game starts and ends.
     """
 
-    def newGame( self, layout, pacmanAgent, ghostAgents, display, maxMoves= -1 ):
+    def newGame( self, layout, pacmanAgent, ghostAgents, display, noOutput, episodesSoFar, numTraining, maxMoves= -1):
         agents = [pacmanAgent] + ghostAgents
         initState = GameState()
         initState.initialize( layout, len(ghostAgents))
         game = Game(agents, display, self)
         game.state = initState
         game.state.maxMoves = maxMoves
+        noOutput = noOutput
+        self.episodesSoFar = episodesSoFar
+        self.numTraining = numTraining
         return game
 
     def process(self, state, game):
@@ -551,6 +559,9 @@ def readCommand( argv ):
                       help='Renders the ghosts in the display (cheating)', default=True)
     parser.add_option('-t', '--frameTime', dest='frameTime', type='float',
                       help=default('Time to delay between frames; <0 means keyboard'), default=0.0)
+    parser.add_option('-x', '--numTraining', dest='numTraining', type='int',
+                      help=default('How many episodes are training (suppresses output)'), default=0)
+    
 
     options, otherjunk = parser.parse_args()
     if len(otherjunk) != 0:
@@ -575,13 +586,22 @@ def readCommand( argv ):
     noKeyboard = options.quietGraphics
     pacmanType = loadAgent(options.pacman, noKeyboard)
     agentOpts = parseAgentArgs(options.agentArgs)
+
+    if options.numTraining > 0:
+        args['numTraining'] = options.numTraining
+        if 'numTraining' not in agentOpts: agentOpts['numTraining'] = options.numTraining
+
     agentOpts['ghostAgents'] = args['ghosts']
     pacman = pacmanType(**agentOpts) # Instantiate Pacman with agentArgs
     args['pacman'] = pacman
-    import graphicsDisplay
-    args['display'] = graphicsDisplay.FirstPersonPacmanGraphics(options.zoom, \
-                                                                  options.showGhosts, \
-                                                                  frameTime = options.frameTime)
+
+    # Choose a display format
+    if options.quietGraphics:
+        import textDisplay
+        args['display'] = textDisplay.NullGraphics()
+    else:
+        import graphicsDisplay
+        args['display'] = graphicsDisplay.PacmanGraphics(options.zoom, frameTime = options.frameTime)
     args['numGames'] = options.numGames
 
     return args
@@ -609,7 +629,7 @@ def loadAgent(pacman, nographics):
                 return getattr(module, pacman)
     raise Exception('The agent ' + pacman + ' is not specified in any *Agents.py.')
 
-def runGames( layout, pacman, ghosts, display, numGames, maxMoves=-1):
+def runGames( layout, pacman, ghosts, display, numGames, maxMoves=2500, numTraining = 0):
     # Hack for agents writing to the display
     import __main__
     __main__.__dict__['_display'] = display
@@ -618,11 +638,24 @@ def runGames( layout, pacman, ghosts, display, numGames, maxMoves=-1):
     games = []
 
     for i in range( numGames ):
-        game = rules.newGame( layout, pacman, ghosts, display, maxMoves )
-        game.run()
-        games.append(game)
+        if (i == numTraining):
+            print 'Starting testing of %d episodes' % (numGames - numTraining)
+        noOutput = i < numTraining
+        if(noOutput):
+            if((i % 10) == 0 and i != 0):
+                print 'Completed %d out of %d training episodes' % (i, numTraining)
+            import textDisplay
+            display = textDisplay.NullGraphics()
+            rules.noOutput = True
+        else:
+            import graphicsDisplay
+            display = graphicsDisplay.PacmanGraphics(1.0, frameTime = 0.0)
+            rules.noOutput = False
+        game = rules.newGame( layout, pacman, ghosts, display, noOutput, i, numTraining, maxMoves)
+        game.run(i, numGames, numTraining)
+        if not noOutput: games.append(game)
 
-    if numGames > 1:
+    if (numGames-numTraining) > 0:
         scores = [game.state.getScore() for game in games]
         wins = [game.state.isWin() for game in games]
         winRate = wins.count(True)/ float(len(wins))

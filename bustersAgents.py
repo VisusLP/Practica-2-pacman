@@ -23,6 +23,8 @@ import os
 last_action = random.choice(['North','South','East','West'])
 state = []
 last_score = 0
+last_dist = 99999
+minDist = 99999
 q_table = []
 
 class NullGraphics:
@@ -747,7 +749,7 @@ class ReinforcementAgent:
     global state
     global q_table
 
-    def __init__( self, index = 0, inference = "ExactInference", ghostAgents = None, observeEnable = True, elapseTimeEnable = True, discount = 0.8):
+    def __init__( self, index = 0, inference = "ExactInference", ghostAgents = None, observeEnable = True, elapseTimeEnable = True, discount = 0.8, numTraining = 10):
         inferenceType = util.lookup(inference, globals())
         self.inferenceModules = [inferenceType(a) for a in ghostAgents]
         self.observeEnable = observeEnable
@@ -760,9 +762,10 @@ class ReinforcementAgent:
         self.last_score = 0
         self.last_action = random.choice(['North','South','East','West'])
         self.state = []
-        self.episodesSoFar = 0
-        self.alpha = 0.2
+        self.alpha = 0.3
         self.discount = float(discount)
+        self.countActions = 0
+        self.episodesSoFar = 0
         
     def registerInitialState(self, gameState):
         "Initializes beliefs and inference modules"
@@ -800,7 +803,18 @@ class ReinforcementAgent:
 
     def getUpdate(self, gameState, action):
 
-        reward = (gameState.getScore() - self.last_score) / 100000
+        if((gameState.getScore() - self.last_score) < 0): 
+            # if(minDist >= last_dist): reward = -0.01
+            # else:
+                reward = 0
+        elif((gameState.getScore() - self.last_score) < 50): reward = 0.25
+        else: reward = 1.5
+        
+        self.countActions = self.countActions + 1
+
+        # if(self.countActions > 50): 
+        #     if (self.epsilon > 0.05):
+        #         self.epsilon = self.epsilon - 0.01
 
         posPacman = gameState.getPacmanPosition()
         state = self.getState(gameState, posPacman)
@@ -813,6 +827,9 @@ class ReinforcementAgent:
         #     self.alpha -= 0.01
 
         return self.update(gameState, state, action, nextState, reward)
+
+    
+
 
 class QLearningAgent(ReinforcementAgent):
     
@@ -844,7 +861,8 @@ class QLearningAgent(ReinforcementAgent):
             self.table_file.write("\n")
 
     def computePosition(self, state):
-        pos = state[0][1] + state[1][1]*4 + state[2][1]*16 + state[3][1]*64
+        # pos = state[0][1] + state[1][1]*4 + state[2][1]*16 + state[3][1]*64
+        pos = self.getNumberAction(state)
         return pos
 
     def getNumberAction(self, action):
@@ -910,18 +928,24 @@ class QLearningAgent(ReinforcementAgent):
 
         action = self.getNumberAction(self.chooseAction(state, gameState))
 
-        if  gameState.getNumAgents() -1 == 0:
-            q_value = ((1 - self.alpha) * self.q_table[pos][action]) + (self.alpha * reward)
-        else:
-            # Se busca la posicion del proximo estado con computePosition()
-            posNext = self.computePosition(nextState)
-            # Obtenemos el mejor Q-value del estado actual, lo que determina la mejor accion.
-            max_a = self.computeValueFromQValues(nextState, gameState)
-            # Por ultimo, calculamos la siguiente accion, y su numero equivalente
-            nextAction = self.computeActionFromQValues(nextState, gameState)
-            nextAction = self.getNumberAction(nextAction)
-            # Se calcula el q-value actual con la siguiente formula
-            q_value = (1 - self.alpha) * self.q_table[pos][action] + (self.alpha * (reward + (self.discount * max_a * self.q_table[posNext][nextAction])))
+        # if  gameState.getNumAgents() -1 == 0:
+        #     q_value = ((1 - self.alpha) * self.q_table[pos][action]) + (self.alpha * reward)
+        # else:
+        #     # Se busca la posicion del proximo estado con computePosition()
+        #     posNext = self.computePosition(nextState)
+        #     # Obtenemos el mejor Q-value del estado actual, lo que determina la mejor accion.
+        #     max_a = self.computeValueFromQValues(nextState, gameState)
+        #     # Por ultimo, calculamos la siguiente accion, y su numero equivalente
+        #     nextAction = self.computeActionFromQValues(nextState, gameState)
+        #     nextAction = self.getNumberAction(nextAction)
+        #     # Se calcula el q-value actual con la siguiente formula
+        #     q_value = (1 - self.alpha) * self.q_table[pos][action] + (self.alpha * (reward + (self.discount * max_a * self.q_table[posNext][nextAction])))
+        
+        q_value = (1 - self.alpha) * self.getQValue(state, action)
+        q_value += self.alpha * (reward + (self.discount * self.computeValueFromQValues(nextState, gameState)))
+
+        
+        
         # Actualizamos la tabla de Q-values
         self.q_table[pos][action] = q_value
         # Escribimos los cambios en el archivo
@@ -949,7 +973,21 @@ class QLearningAgent(ReinforcementAgent):
         else:
             return ['illegal', 3]
 
+    def final(self, state, episodesSoFar, numGames, numTraining):
+        episodesSoFar = episodesSoFar + 1
+        if (episodesSoFar >= numTraining and numTraining > 0):
+            #print 'changing alpha (%.2f)and epsilon(%.2f)' % (self.alpha, self.epsilon)
+            self.alpha = 0
+            self.epsilon = 0
+            #print 'changed alpha (%.2f)and epsilon(%.2f)' % (self.alpha, self.epsilon)
+        elif(self.epsilon > 0.05):
+            #print 'actual epsilon = %.2f' % (self.epsilon)
+            self.epsilon = self.epsilon - 0.005
+            #print 'modified epsilon = %.2f' % (self.epsilon)
+
     def getState(self, gameState, posPacman):
+        global last_dist
+        global minDist
         # Almacenamos en variables una serie de datos relevantes
         legal = gameState.getLegalActions(0) ##Legal position from the pacman
         # Por defecto, el movimiento a ejecutar es "Stop"
@@ -1079,7 +1117,8 @@ class QLearningAgent(ReinforcementAgent):
         distSouth = self.getFuzzyDistance(distSouth)
         distEast = self.getFuzzyDistance(distEast)
         distWest = self.getFuzzyDistance(distWest)
-        state = distNorth, distSouth, distEast, distWest
+        # state = distNorth, distSouth, distEast, distWest
+        state = bestMove
 
         return state
 
