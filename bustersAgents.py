@@ -758,7 +758,7 @@ class ReinforcementAgent:
         global q_table
         self.table_file = open("qtable.txt", "r+")
         self.q_table = self.readQtable()
-        self.epsilon = 0.2
+        self.epsilon = 0.5
         self.last_score = 0
         self.last_action = random.choice(['North','South','East','West'])
         self.state = []
@@ -796,19 +796,18 @@ class ReinforcementAgent:
         state = self.getState(gameState, posPacman)
         return self.chooseAction(state, gameState)
 
-    def chooseAction(self, state, gameState):
-        "By default, a BustersAgent just stops.  This should be overridden."
-        last_action = self.chooseAction(state, gameState)
-        return last_action
 
     def getUpdate(self, gameState, action):
 
-        if((gameState.getScore() - self.last_score) < 0): 
+        if((gameState.getScore() - self.last_score) <= 0): 
             # if(minDist >= last_dist): reward = -0.01
             # else:
                 reward = 0
-        elif((gameState.getScore() - self.last_score) < 50): reward = 0.25
-        else: reward = 1.5
+        # elif((gameState.getScore() - self.last_score) < 50): reward = 0.25
+        else: 
+            reward = 0.25
+
+        self.last_score = gameState.getScore()
         
         self.countActions = self.countActions + 1
 
@@ -818,11 +817,11 @@ class ReinforcementAgent:
 
         posPacman = gameState.getPacmanPosition()
         state = self.getState(gameState, posPacman)
-
-        posPacman = self.getPacmanPosition(posPacman, last_action)
         
-        nextState = self.getState(gameState, posPacman)
+        nextState = gameState.generatePacmanSuccessor(action)
 
+        if nextState == 'TERMINAL_STATE':
+            reward = 1
         # if (self.alpha > 0.05):
         #     self.alpha -= 0.01
 
@@ -862,7 +861,8 @@ class QLearningAgent(ReinforcementAgent):
 
     def computePosition(self, state):
         # pos = state[0][1] + state[1][1]*4 + state[2][1]*16 + state[3][1]*64
-        pos = self.getNumberAction(state)
+        # pos = self.getNumberAction(state)
+        pos = state[0] + state[1]*2 + state[2]*4 + state[3]*8
         return pos
 
     def getNumberAction(self, action):
@@ -883,8 +883,9 @@ class QLearningAgent(ReinforcementAgent):
         flip = util.flipCoin(self.epsilon)
 
         if flip:
-            return random.choice(legal)
-        return self.computeActionFromQValues(state, gameState)
+            last_action = random.choice(legal)
+        last_action = self.computeActionFromQValues(state, gameState)
+        return last_action
 
     def computeActionFromQValues(self, state, gameState):
 
@@ -926,7 +927,7 @@ class QLearningAgent(ReinforcementAgent):
     def update(self, gameState, state, action, nextState, reward):
         pos = self.computePosition(state)
 
-        action = self.getNumberAction(self.chooseAction(state, gameState))
+        action = self.getNumberAction(last_action)
 
         # if  gameState.getNumAgents() -1 == 0:
         #     q_value = ((1 - self.alpha) * self.q_table[pos][action]) + (self.alpha * reward)
@@ -940,11 +941,12 @@ class QLearningAgent(ReinforcementAgent):
         #     nextAction = self.getNumberAction(nextAction)
         #     # Se calcula el q-value actual con la siguiente formula
         #     q_value = (1 - self.alpha) * self.q_table[pos][action] + (self.alpha * (reward + (self.discount * max_a * self.q_table[posNext][nextAction])))
-        
-        q_value = (1 - self.alpha) * self.getQValue(state, action)
-        q_value += self.alpha * (reward + (self.discount * self.computeValueFromQValues(nextState, gameState)))
+        if(nextState == 'TERMINAL_STATE'):
+            q_value = ((1 - self.alpha) * self.q_table[pos][action]) + (self.alpha * reward)
+        else:
+            q_value = (1 - self.alpha) * self.getQValue(state, action)
+            q_value += self.alpha * (reward + (self.discount * self.computeValueFromQValues(nextState, gameState)))
 
-        
         
         # Actualizamos la tabla de Q-values
         self.q_table[pos][action] = q_value
@@ -973,6 +975,16 @@ class QLearningAgent(ReinforcementAgent):
         else:
             return ['illegal', 3]
 
+    def checkIfMinDist(self, minDist, distances):
+        result = []
+        for i in distances:
+            if (minDist == i):
+                result.append(1)
+            else:
+                result.append(0)
+        return result
+        
+
     def final(self, state, episodesSoFar, numGames, numTraining):
         episodesSoFar = episodesSoFar + 1
         if (episodesSoFar >= numTraining and numTraining > 0):
@@ -1000,6 +1012,8 @@ class QLearningAgent(ReinforcementAgent):
         minDist = 99999
         walls = gameState.getWalls()
         livingGhosts = gameState.getLivingGhosts()
+        if livingGhosts.count(True) == 0:
+            return "TERMINAL_STATE"
         #move NORTH
         if Directions.NORTH in legal:
             # Inicia un contador a 1 para no tener el cuenta el pacman
@@ -1112,13 +1126,18 @@ class QLearningAgent(ReinforcementAgent):
                                     bestMove = Directions.WEST
                         iterator = iterator + 1
 
+        result = [distNorth, distSouth, distEast, distWest]
+        state = self.checkIfMinDist(minDist, result)
 
-        distNorth = self.getFuzzyDistance(distNorth)
-        distSouth = self.getFuzzyDistance(distSouth)
-        distEast = self.getFuzzyDistance(distEast)
-        distWest = self.getFuzzyDistance(distWest)
+
+        # distNorth = self.getFuzzyDistance(distNorth)
+        # distSouth = self.getFuzzyDistance(distSouth)
+        # distEast = self.getFuzzyDistance(distEast)
+        # distWest = self.getFuzzyDistance(distWest)
         # state = distNorth, distSouth, distEast, distWest
-        state = bestMove
+
+
+        #state = bestMove
 
         return state
 

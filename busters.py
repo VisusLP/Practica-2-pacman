@@ -269,8 +269,8 @@ class GameState:
     def isLose( self ):
         if self.maxMoves > 0 and self.numMoves >= self.maxMoves:
             return True
-        if self.getScore() <= -500:
-            return True
+        # if self.getScore() <= -500:
+        #     return True
         else: 
             return False
 
