@@ -26,6 +26,7 @@ last_score = 0
 last_dist = 99999
 minDist = 99999
 q_table = []
+lastState = None
 
 class NullGraphics:
     "Placeholder for graphics"
@@ -758,7 +759,7 @@ class ReinforcementAgent:
         global q_table
         self.table_file = open("qtable.txt", "r+")
         self.q_table = self.readQtable()
-        self.epsilon = 0.5
+        self.epsilon = 0.3
         self.last_score = 0
         self.last_action = random.choice(['North','South','East','West'])
         self.state = []
@@ -776,11 +777,6 @@ class ReinforcementAgent:
         self.ghostBeliefs = [inf.getBeliefDistribution() for inf in self.inferenceModules]
         self.firstMove = True
 
-    def observationFunction(self, gameState):
-        "Removes the ghost states from the gameState"
-        agents = gameState.data.agentStates
-        gameState.data.agentStates = [agents[0]] + [None for i in range(1, len(agents))]
-        return gameState
 
     def getAction(self, gameState):
         "Updates beliefs, then chooses an action based on updated beliefs."
@@ -793,8 +789,9 @@ class ReinforcementAgent:
         #    self.ghostBeliefs[index] = inf.getBeliefDistribution()
         #self.display.updateDistributions(self.ghostBeliefs)
         posPacman = gameState.getPacmanPosition()
-        state = self.getState(gameState, posPacman)
-        return self.chooseAction(state, gameState)
+        state = self.getState(gameState)
+        lastAction = self.chooseAction(state, gameState)
+        return lastAction
 
 
     def getUpdate(self, gameState, action):
@@ -815,19 +812,17 @@ class ReinforcementAgent:
         #     if (self.epsilon > 0.05):
         #         self.epsilon = self.epsilon - 0.01
 
-        posPacman = gameState.getPacmanPosition()
-        state = self.getState(gameState, posPacman)
+        state = self.getState(lastState)
         
-        nextState = gameState.generatePacmanSuccessor(action)
-
-        if nextState == 'TERMINAL_STATE':
-            reward = 1
+        livingGhosts = gameState.getLivingGhosts()
+        if livingGhosts.count(True) == 0:
+            reward = 0.26
         # if (self.alpha > 0.05):
         #     self.alpha -= 0.01
 
-        return self.update(gameState, state, action, nextState, reward)
-
+        return self.update(lastState, state, action, gameState, reward)
     
+
 
 
 class QLearningAgent(ReinforcementAgent):
@@ -862,7 +857,7 @@ class QLearningAgent(ReinforcementAgent):
     def computePosition(self, state):
         # pos = state[0][1] + state[1][1]*4 + state[2][1]*16 + state[3][1]*64
         # pos = self.getNumberAction(state)
-        pos = state[0] + state[1]*2 + state[2]*4 + state[3]*8
+        pos = state[0]*8 + state[1]*4 + state[2]*2 + state[3]
         return pos
 
     def getNumberAction(self, action):
@@ -877,9 +872,11 @@ class QLearningAgent(ReinforcementAgent):
         return action
 
     def chooseAction(self, state, gameState):
+        global lastState
         legal = gameState.getLegalActions(0)
-        
-
+        if (len(legal) == 0):
+            return None
+        lastState = gameState
         flip = util.flipCoin(self.epsilon)
 
         if flip:
@@ -925,31 +922,37 @@ class QLearningAgent(ReinforcementAgent):
         return self.q_table[position][action_column]
 
     def update(self, gameState, state, action, nextState, reward):
-        pos = self.computePosition(state)
+        if state !=  None:
+            q_value = 0
+            pos = self.computePosition(state)
 
-        action = self.getNumberAction(last_action)
+            action = self.getNumberAction(last_action)
 
-        # if  gameState.getNumAgents() -1 == 0:
-        #     q_value = ((1 - self.alpha) * self.q_table[pos][action]) + (self.alpha * reward)
-        # else:
-        #     # Se busca la posicion del proximo estado con computePosition()
-        #     posNext = self.computePosition(nextState)
-        #     # Obtenemos el mejor Q-value del estado actual, lo que determina la mejor accion.
-        #     max_a = self.computeValueFromQValues(nextState, gameState)
-        #     # Por ultimo, calculamos la siguiente accion, y su numero equivalente
-        #     nextAction = self.computeActionFromQValues(nextState, gameState)
-        #     nextAction = self.getNumberAction(nextAction)
-        #     # Se calcula el q-value actual con la siguiente formula
-        #     q_value = (1 - self.alpha) * self.q_table[pos][action] + (self.alpha * (reward + (self.discount * max_a * self.q_table[posNext][nextAction])))
-        if(nextState == 'TERMINAL_STATE'):
-            q_value = ((1 - self.alpha) * self.q_table[pos][action]) + (self.alpha * reward)
-        else:
-            q_value = (1 - self.alpha) * self.getQValue(state, action)
-            q_value += self.alpha * (reward + (self.discount * self.computeValueFromQValues(nextState, gameState)))
+            # if  gameState.getNumAgents() -1 == 0:
+            #     q_value = ((1 - self.alpha) * self.q_table[pos][action]) + (self.alpha * reward)
+            # else:
+            #     # Se busca la posicion del proximo estado con computePosition()
+            #     posNext = self.computePosition(nextState)
+            #     # Obtenemos el mejor Q-value del estado actual, lo que determina la mejor accion.
+            #     max_a = self.computeValueFromQValues(nextState, gameState)
+            #     # Por ultimo, calculamos la siguiente accion, y su numero equivalente
+            #     nextAction = self.computeActionFromQValues(nextState, gameState)
+            #     nextAction = self.getNumberAction(nextAction)
+            #     # Se calcula el q-value actual con la siguiente formula
+            #     q_value = (1 - self.alpha) * self.q_table[pos][action] + (self.alpha * (reward + (self.discount * max_a * self.q_table[posNext][nextAction])))
+            
+            if(reward == 0.26):
+                q_value = ((1 - self.alpha) * self.q_table[pos][action]) + (self.alpha * reward)
+            else:
+                next_state = self.getState(nextState)
+                if (nextState != None and next_state != None):
+                    next_action = self.getNumberAction(self.chooseAction(next_state, nextState))
+                    posNext = self.computePosition(next_state)
+                    q_value = (1 - self.alpha) * self.q_table[pos][action]
+                    q_value += self.alpha * (reward + (self.discount * self.computeValueFromQValues(next_state, gameState) * self.q_table[posNext][next_action]))
 
-        
-        # Actualizamos la tabla de Q-values
-        self.q_table[pos][action] = q_value
+            # Actualizamos la tabla de Q-values
+            self.q_table[pos][action] = q_value
         # Escribimos los cambios en el archivo
         self.writeQtable()
 
@@ -983,9 +986,9 @@ class QLearningAgent(ReinforcementAgent):
             else:
                 result.append(0)
         return result
-        
 
-    def final(self, state, episodesSoFar, numGames, numTraining):
+
+    def final(self, gameState, episodesSoFar, numTraining):
         episodesSoFar = episodesSoFar + 1
         if (episodesSoFar >= numTraining and numTraining > 0):
             #print 'changing alpha (%.2f)and epsilon(%.2f)' % (self.alpha, self.epsilon)
@@ -997,17 +1000,21 @@ class QLearningAgent(ReinforcementAgent):
             self.epsilon = self.epsilon - 0.005
             #print 'modified epsilon = %.2f' % (self.epsilon)
 
-    def getState(self, gameState, posPacman):
+    def getState(self, gameState):
         global last_dist
         global minDist
         # Almacenamos en variables una serie de datos relevantes
         legal = gameState.getLegalActions(0) ##Legal position from the pacman
         # Por defecto, el movimiento a ejecutar es "Stop"
+        if len(legal) == 0:
+            return None
         bestMove = random.choice(legal)
         distNorth = 99999
         distSouth = 99999
         distEast = 99999
         distWest = 99999
+
+        posPacman = gameState.getPacmanPosition()
 
         minDist = 99999
         walls = gameState.getWalls()
@@ -1022,25 +1029,17 @@ class QLearningAgent(ReinforcementAgent):
             buffPacman = posPacman[0], posPacman[1] + 1
             # Comprueba que la casilla objetivo no contenga un muro
             if walls[buffPacman[0]][buffPacman[1]] == False:
-                if gameState.getDistanceNearestFood() != None:
-                    foodPos = gameState.getPositionNearestFood(buffPacman)
-                    if self.distancer.getDistance(foodPos, buffPacman) < distNorth:
-                        distNorth = self.distancer.getDistance(foodPos, buffPacman)
-                        if distNorth < minDist:
-                            minDist = distNorth
-                            bestMove = Directions.NORTH
-                else:
-                    # Itera sobre los fantasmas
-                    for x in gameState.getGhostPositions():
-                        # Comprueba que los fantasmas estan vivos
-                        if livingGhosts[iterator] == True:
-                            # Se comprueba si la distancia es menor que la minima de todas las acciones
-                            if self.distancer.getDistance(x, buffPacman) < distNorth:
-                                distNorth = self.distancer.getDistance(x, buffPacman)
-                                if distNorth < minDist:
-                                    minDist = distNorth
-                                    bestMove = Directions.NORTH
-                        iterator = iterator + 1
+                # Itera sobre los fantasmas
+                for x in gameState.getGhostPositions():
+                    # Comprueba que los fantasmas estan vivos
+                    if livingGhosts[iterator] == True:
+                        # Se comprueba si la distancia es menor que la minima de todas las acciones
+                        if self.distancer.getDistance(x, buffPacman) < distNorth:
+                            distNorth = self.distancer.getDistance(x, buffPacman)
+                            if distNorth < minDist:
+                                minDist = distNorth
+                                bestMove = Directions.NORTH
+                    iterator = iterator + 1
         #move SOUTH
         if Directions.SOUTH in legal:
             # Inicia un contador a 1 para no tener el cuenta el pacman
@@ -1049,26 +1048,18 @@ class QLearningAgent(ReinforcementAgent):
             buffPacman = posPacman[0], posPacman[1] - 1
             # Comprueba que la casilla objetivo no contenga un muro
             if walls[buffPacman[0]][buffPacman[1]] == False:
-                if gameState.getDistanceNearestFood() != None:
-                    foodPos = gameState.getPositionNearestFood(buffPacman)
-                    if self.distancer.getDistance(foodPos, buffPacman) < distSouth:
-                        distSouth = self.distancer.getDistance(foodPos, buffPacman)
-                        if distSouth < minDist:
-                            minDist = distSouth
-                            bestMove = Directions.SOUTH
-                else:
-                    # Itera sobre los fantasmas
-                    for x in gameState.getGhostPositions():
-                        # Comprueba que los fantasmas estan vivos
-                        if livingGhosts[iterator] == True:
-                            # Se comprueba si la distancia es menor que la minima de todas las acciones
-                            if self.distancer.getDistance(x, buffPacman) < distSouth:
-                                distSouth = self.distancer.getDistance(x, buffPacman)
-                                if distSouth < minDist:
-                                    # Se sobreescribe y se cambia el movimiento a realizar
-                                    minDist = distSouth
-                                    bestMove = Directions.SOUTH
-                        iterator = iterator + 1
+                # Itera sobre los fantasmas
+                for x in gameState.getGhostPositions():
+                    # Comprueba que los fantasmas estan vivos
+                    if livingGhosts[iterator] == True:
+                        # Se comprueba si la distancia es menor que la minima de todas las acciones
+                        if self.distancer.getDistance(x, buffPacman) < distSouth:
+                            distSouth = self.distancer.getDistance(x, buffPacman)
+                            if distSouth < minDist:
+                                # Se sobreescribe y se cambia el movimiento a realizar
+                                minDist = distSouth
+                                bestMove = Directions.SOUTH
+                    iterator = iterator + 1
         #move EAST
         if Directions.EAST in legal:
             # Inicia un contador a 1 para no tener el cuenta el pacman
@@ -1077,26 +1068,18 @@ class QLearningAgent(ReinforcementAgent):
             buffPacman = posPacman[0] + 1, posPacman[1]
             # Comprueba que la casilla objetivo no contenga un muro
             if walls[buffPacman[0]][buffPacman[1]] == False:
-                if gameState.getDistanceNearestFood() != None:
-                    foodPos = gameState.getPositionNearestFood(buffPacman)
-                    if self.distancer.getDistance(foodPos, buffPacman) < distEast:
-                        distEast = self.distancer.getDistance(foodPos, buffPacman)
-                        if distEast < minDist:
-                            minDist = distEast
-                            bestMove = Directions.EAST
-                else:
-                    # Itera sobre los fantasmas
-                    for x in gameState.getGhostPositions():
-                        # Comprueba que los fantasmas estan vivos
-                        if livingGhosts[iterator] == True:
-                            # Se comprueba si la distancia es menor que la minima de todas las acciones
-                            if self.distancer.getDistance(x, buffPacman) < distEast:
-                                distEast = self.distancer.getDistance(x, buffPacman)
-                                if distEast < minDist:
-                                    # Se sobreescribe y se cambia el movimiento a realizar
-                                    minDist = distEast
-                                    bestMove = Directions.EAST
-                        iterator = iterator + 1
+                # Itera sobre los fantasmas
+                for x in gameState.getGhostPositions():
+                    # Comprueba que los fantasmas estan vivos
+                    if livingGhosts[iterator] == True:
+                        # Se comprueba si la distancia es menor que la minima de todas las acciones
+                        if self.distancer.getDistance(x, buffPacman) < distEast:
+                            distEast = self.distancer.getDistance(x, buffPacman)
+                            if distEast < minDist:
+                                # Se sobreescribe y se cambia el movimiento a realizar
+                                minDist = distEast
+                                bestMove = Directions.EAST
+                    iterator = iterator + 1
         #move WEST
         if Directions.WEST in legal:
             # Inicia un contador a 1 para no tener el cuenta el pacman
@@ -1105,26 +1088,18 @@ class QLearningAgent(ReinforcementAgent):
             buffPacman = posPacman[0] - 1, posPacman[1]
             # Comprueba que la casilla objetivo no contenga un muro
             if walls[buffPacman[0]][buffPacman[1]] == False:
-                if gameState.getDistanceNearestFood() != None:
-                    foodPos = gameState.getPositionNearestFood(buffPacman)
-                    if self.distancer.getDistance(foodPos, buffPacman) < distWest:
-                        distWest = self.distancer.getDistance(foodPos, buffPacman)
-                        if distWest < minDist:
-                            minDist = distWest
-                            bestMove = Directions.WEST
-                else:
-                    # Itera sobre los fantasmas
-                    for x in gameState.getGhostPositions():
-                        # Comprueba que los fantasmas estan vivos
-                        if livingGhosts[iterator] == True:
-                            # Se comprueba si la distancia es menor que la minima de todas las acciones
-                            if self.distancer.getDistance(x, buffPacman) < distWest:
-                                distWest = self.distancer.getDistance(x, buffPacman)
-                                if distWest < minDist:
-                                    # Se sobreescribe y se cambia el movimiento a realizar
-                                    minDist = distWest
-                                    bestMove = Directions.WEST
-                        iterator = iterator + 1
+            # Itera sobre los fantasmas
+                for x in gameState.getGhostPositions():
+                    # Comprueba que los fantasmas estan vivos
+                    if livingGhosts[iterator] == True:
+                        # Se comprueba si la distancia es menor que la minima de todas las acciones
+                        if self.distancer.getDistance(x, buffPacman) < distWest:
+                            distWest = self.distancer.getDistance(x, buffPacman)
+                            if distWest < minDist:
+                                # Se sobreescribe y se cambia el movimiento a realizar
+                                minDist = distWest
+                                bestMove = Directions.WEST
+                    iterator = iterator + 1
 
         result = [distNorth, distSouth, distEast, distWest]
         state = self.checkIfMinDist(minDist, result)
@@ -1137,7 +1112,7 @@ class QLearningAgent(ReinforcementAgent):
         # state = distNorth, distSouth, distEast, distWest
 
 
-        #state = bestMove
+        # state = bestMove
 
         return state
 

@@ -728,7 +728,7 @@ class Game:
             if "final" in dir( agent ) :
                 try:
                     self.mute(agentIndex)
-                    agent.final( self.state, episodesSoFar, numGames, numTraining )
+                    agent.final( self.state, episodesSoFar, numTraining )
                     self.unmute()
                 except Exception,data:
                     if not self.catchExceptions: raise

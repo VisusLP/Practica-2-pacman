@@ -268,6 +268,7 @@ class GameState:
 
     def isLose( self ):
         if self.maxMoves > 0 and self.numMoves >= self.maxMoves:
+            print 'Game lost'
             return True
         # if self.getScore() <= -500:
         #     return True
@@ -278,7 +279,10 @@ class GameState:
         return self.numMoves
 
     def isWin( self ):
-        return self.livingGhosts.count(True) == 0
+        if (self.livingGhosts.count(True) == 0):
+            # print 'Game won'
+            return True
+        return 
 
     def getNoisyGhostDistances(self):
         """
@@ -629,7 +633,7 @@ def loadAgent(pacman, nographics):
                 return getattr(module, pacman)
     raise Exception('The agent ' + pacman + ' is not specified in any *Agents.py.')
 
-def runGames( layout, pacman, ghosts, display, numGames, maxMoves=2500, numTraining = 0):
+def runGames( layout, pacman, ghosts, display, numGames, maxMoves=5000, numTraining = 0):
     # Hack for agents writing to the display
     import __main__
     __main__.__dict__['_display'] = display
