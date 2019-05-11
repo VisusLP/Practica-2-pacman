@@ -268,7 +268,7 @@ class GameState:
 
     def isLose( self ):
         if self.maxMoves > 0 and self.numMoves >= self.maxMoves:
-            print 'Game lost'
+            # print 'Game lost'
             return True
         # if self.getScore() <= -500:
         #     return True
@@ -563,8 +563,22 @@ def readCommand( argv ):
                       help='Renders the ghosts in the display (cheating)', default=True)
     parser.add_option('-t', '--frameTime', dest='frameTime', type='float',
                       help=default('Time to delay between frames; <0 means keyboard'), default=0.0)
+
+
     parser.add_option('-x', '--numTraining', dest='numTraining', type='int',
                       help=default('How many episodes are training (suppresses output)'), default=0)
+    parser.add_option('-d', '--discount',action='store',
+                      type='float',dest='discount',default=0.8,
+                      help='Discount on future (default %default)')
+    parser.add_option('-r', '--reward',action='store',
+                      type='float',dest='reward',default=0.25,
+                      metavar="R", help='Reward for living for a time step (default %default)')
+    parser.add_option('-e', '--epsilon',action='store',
+                      type='float',dest='epsilon',default=0.5,
+                      metavar="E", help='Chance of taking a random action in q-learning (default %default)')
+    parser.add_option('-o', '--learningRate',action='store',
+                      type='float',dest='learningRate',default=0.3,
+                      metavar="P", help='TD learning rate (default %default)' )
     
 
     options, otherjunk = parser.parse_args()
@@ -641,12 +655,14 @@ def runGames( layout, pacman, ghosts, display, numGames, maxMoves=5000, numTrain
     rules = BustersGameRules()
     games = []
 
+    updateEpisodes = (int)(numTraining / 10)
+
     for i in range( numGames ):
         if (i == numTraining):
             print 'Starting testing of %d episodes' % (numGames - numTraining)
         noOutput = i < numTraining
         if(noOutput):
-            if((i % 10) == 0 and i != 0):
+            if((i % updateEpisodes) == 0 and i != 0):
                 print 'Completed %d out of %d training episodes' % (i, numTraining)
             import textDisplay
             display = textDisplay.NullGraphics()
@@ -656,7 +672,7 @@ def runGames( layout, pacman, ghosts, display, numGames, maxMoves=5000, numTrain
             display = graphicsDisplay.PacmanGraphics(1.0, frameTime = 0.0)
             rules.noOutput = False
         game = rules.newGame( layout, pacman, ghosts, display, noOutput, i, numTraining, maxMoves)
-        game.run(i, numGames, numTraining)
+        game.run()
         if not noOutput: games.append(game)
 
     if (numGames-numTraining) > 0:

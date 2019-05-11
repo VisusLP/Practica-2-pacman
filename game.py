@@ -564,7 +564,7 @@ class Game:
         sys.stdout = OLD_STDOUT
         sys.stderr = OLD_STDERR
 
-    def run( self, episodesSoFar, numGames, numTraining):
+    def run( self):
         """
         Main control loop for game play.
         """
@@ -720,15 +720,15 @@ class Game:
 
             if _BOINC_ENABLED:
                 boinc.set_fraction_done(self.getProgress())
-            if agentIndex == 1:
-                agent.getUpdate(observation, action)
+            # if agentIndex == 1:
+            #     agent.getUpdate(observation, action)
 
         # inform a learning agent of the game result
         for agentIndex, agent in enumerate(self.agents):
             if "final" in dir( agent ) :
                 try:
                     self.mute(agentIndex)
-                    agent.final( self.state, episodesSoFar, numTraining )
+                    agent.final( self.state)
                     self.unmute()
                 except Exception,data:
                     if not self.catchExceptions: raise
