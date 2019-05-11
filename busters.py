@@ -620,10 +620,10 @@ def readCommand( argv ):
     # Choose a display format
     if options.quietGraphics:
         import textDisplay
-        args['display'] = textDisplay.NullGraphics()
+        args['display'] = "quiet"
     else:
         import graphicsDisplay
-        args['display'] = graphicsDisplay.PacmanGraphics(options.zoom, frameTime = options.frameTime)
+        args['display'] = "graphics"
     
 
     return args
@@ -664,6 +664,8 @@ def runGames( layout, pacman, ghosts, display, numGames, maxMoves=5000, numTrain
     updateEpisodes = (int)(numTraining / 10)
     if updateEpisodes == 0:
         updateEpisodes = 1
+    # If the argument -q has been used, the game will generate no graphical output
+    quiet = (display == "quiet")
 
     for i in range( numGames ):
         # Informs the user that the program will run the desired number of games
@@ -671,7 +673,7 @@ def runGames( layout, pacman, ghosts, display, numGames, maxMoves=5000, numTrain
             print 'Starting testing of %d episodes' % (numGames - numTraining)
         # If we are in the training session, the program won't use the graphics display to save time
         noOutput = i < numTraining
-        if(noOutput):
+        if(noOutput or quiet):
             # The program will print an update on the progress if there isn't graphical output
             if((i % updateEpisodes) == 0 and i != 0):
                 print 'Completed %d out of %d training episodes' % (i, numTraining)
@@ -689,7 +691,7 @@ def runGames( layout, pacman, ghosts, display, numGames, maxMoves=5000, numTrain
         # We only add to the game history games that aren't in the training session
         if not noOutput: games.append(game)
         # If this is the last game of the training session, it prints a message informing the user
-        if (i == numTraining - 1):
+        if (i == numTraining - 1 or i == numGames - 1):
             print 'Completed %d out of %d training episodes' % (i+1, numTraining)
 
     if (numGames-numTraining) > 0:

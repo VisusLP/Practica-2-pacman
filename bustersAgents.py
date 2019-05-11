@@ -782,6 +782,7 @@ class ReinforcementAgent:
             self.alpha = 0
             self.epsilon = 0
             #print 'changed alpha (%.2f)and epsilon(%.2f)' % (self.alpha, self.epsilon)
+        # The epsilon value gets reduced each time a game ends. In 100 games it will be decreased by 0.5
         elif(self.epsilon > 0.05):
             #print 'actual epsilon = %.2f' % (self.epsilon)
             self.epsilon = self.epsilon - 0.005
