@@ -371,16 +371,16 @@ class BustersGameRules:
     and how the game starts and ends.
     """
 
-    def newGame( self, layout, pacmanAgent, ghostAgents, display, noOutput, episodesSoFar, numTraining, maxMoves= -1):
+    def newGame( self, layout, pacmanAgent, ghostAgents, display, episodesSoFar, numTraining, maxMoves= -1):
         agents = [pacmanAgent] + ghostAgents
         initState = GameState()
         initState.initialize( layout, len(ghostAgents))
         game = Game(agents, display, self)
         game.state = initState
         game.state.maxMoves = maxMoves
-        noOutput = noOutput
         self.episodesSoFar = episodesSoFar
         self.numTraining = numTraining
+
         return game
 
     def process(self, state, game):
@@ -564,19 +564,16 @@ def readCommand( argv ):
     parser.add_option('-t', '--frameTime', dest='frameTime', type='float',
                       help=default('Time to delay between frames; <0 means keyboard'), default=0.0)
 
-
+    # We recieve additional arguments in order to make the testing easier
     parser.add_option('-x', '--numTraining', dest='numTraining', type='int',
                       help=default('How many episodes are training (suppresses output)'), default=0)
     parser.add_option('-d', '--discount',action='store',
                       type='float',dest='discount',default=0.8,
                       help='Discount on future (default %default)')
-    parser.add_option('-r', '--reward',action='store',
-                      type='float',dest='reward',default=0.25,
-                      metavar="R", help='Reward for living for a time step (default %default)')
     parser.add_option('-e', '--epsilon',action='store',
                       type='float',dest='epsilon',default=0.5,
                       metavar="E", help='Chance of taking a random action in q-learning (default %default)')
-    parser.add_option('-o', '--learningRate',action='store',
+    parser.add_option('-r', '--learningRate',action='store',
                       type='float',dest='learningRate',default=0.3,
                       metavar="P", help='TD learning rate (default %default)' )
     
@@ -610,6 +607,13 @@ def readCommand( argv ):
         if 'numTraining' not in agentOpts: agentOpts['numTraining'] = options.numTraining
 
     agentOpts['ghostAgents'] = args['ghosts']
+
+    args['numGames'] = options.numGames
+    # Stores the values of the discount, epsilon and gamma variables
+    agentOpts['discount'] = options.discount
+    agentOpts['epsilon'] = options.epsilon
+    agentOpts['alpha'] = options.learningRate
+
     pacman = pacmanType(**agentOpts) # Instantiate Pacman with agentArgs
     args['pacman'] = pacman
 
@@ -620,7 +624,7 @@ def readCommand( argv ):
     else:
         import graphicsDisplay
         args['display'] = graphicsDisplay.PacmanGraphics(options.zoom, frameTime = options.frameTime)
-    args['numGames'] = options.numGames
+    
 
     return args
 
@@ -655,25 +659,38 @@ def runGames( layout, pacman, ghosts, display, numGames, maxMoves=5000, numTrain
     rules = BustersGameRules()
     games = []
 
+    # If we are in a training session, we will print a message every tenth of the way progressed
+    # In case the number of training games is less than 10, we will print it every game
     updateEpisodes = (int)(numTraining / 10)
+    if updateEpisodes == 0:
+        updateEpisodes = 1
 
     for i in range( numGames ):
+        # Informs the user that the program will run the desired number of games
         if (i == numTraining):
             print 'Starting testing of %d episodes' % (numGames - numTraining)
+        # If we are in the training session, the program won't use the graphics display to save time
         noOutput = i < numTraining
         if(noOutput):
+            # The program will print an update on the progress if there isn't graphical output
             if((i % updateEpisodes) == 0 and i != 0):
                 print 'Completed %d out of %d training episodes' % (i, numTraining)
+            # The program will use the NullGraphics function to not print anything
             import textDisplay
             display = textDisplay.NullGraphics()
             rules.noOutput = True
         else:
+            # The program will use the regular interface the rest of the time
             import graphicsDisplay
             display = graphicsDisplay.PacmanGraphics(1.0, frameTime = 0.0)
             rules.noOutput = False
-        game = rules.newGame( layout, pacman, ghosts, display, noOutput, i, numTraining, maxMoves)
+        game = rules.newGame(layout, pacman, ghosts, display, 0 , numTraining, maxMoves)
         game.run()
+        # We only add to the game history games that aren't in the training session
         if not noOutput: games.append(game)
+        # If this is the last game of the training session, it prints a message informing the user
+        if (i == numTraining - 1):
+            print 'Completed %d out of %d training episodes' % (i+1, numTraining)
 
     if (numGames-numTraining) > 0:
         scores = [game.state.getScore() for game in games]

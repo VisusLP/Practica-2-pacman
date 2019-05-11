@@ -20,14 +20,6 @@ import inference
 import busters
 import os
 
-last_action = random.choice(['North','South','East','West'])
-state = []
-lastScore = 0
-last_dist = 99999
-minDist = 99999
-q_table = []
-lastState = None
-
 class NullGraphics:
     "Placeholder for graphics"
     def initialize(self, state, isBlue = False):
@@ -745,33 +737,26 @@ class BasicAgentAA(BustersAgent):
         file.write("\n@data\n")
 
 class ReinforcementAgent:
-    global last_action
-    global lastScore
-    global state
-    global q_table
 
-    def __init__( self, index = 0, inference = "ExactInference", ghostAgents = None, observeEnable = True, elapseTimeEnable = True, discount = 0.8, numTraining = 10):
+    def __init__( self, numTraining = 0, epsilon = 0.3, alpha = 0.3, index = 0, inference = "ExactInference", ghostAgents = None, observeEnable = True, elapseTimeEnable = True, discount = 0.8 ):
         inferenceType = util.lookup(inference, globals())
         self.inferenceModules = [inferenceType(a) for a in ghostAgents]
         self.observeEnable = observeEnable
         self.elapseTimeEnable = elapseTimeEnable
-        global last_action
-        global q_table
         self.table_file = open("qtable.txt", "r+")
         self.q_table = self.readQtable()
-        self.epsilon = 0.5
-        self.lastScore = 0
-        self.last_action = random.choice(['North','South','East','West'])
-        self.state = []
-        self.alpha = 0.3
+        self.epsilon = float(epsilon)
+        self.alpha = float(alpha)
         self.discount = float(discount)
         self.episodesSoFar = 0
         self.numTraining = numTraining
         self.loopCounter = 0
-        self.noRewardTurns = 0
         
     def registerInitialState(self, gameState):
-        "Initializes beliefs and inference modules"
+        """
+            Initializes beliefs and inference modules.
+            Also, it starts the episode
+        """
         import __main__
         self.display = __main__._display
         for inference in self.inferenceModules:
@@ -781,13 +766,16 @@ class ReinforcementAgent:
 
     def startEpisode(self):
         """
-          Called by environment when new episode is starting
+            Whenever a new episode starts, these variables are reset
         """
         self.lastState = None
         self.lastAction = None
-        self.episodeRewards = 0.0
+        self.lastScore = 0
 
     def stopEpisode(self):
+        """
+            Detects when an episode has finished, and makes some adjustements
+        """
         self.episodesSoFar = self.episodesSoFar + 1
         if (self.episodesSoFar >= self.numTraining and self.numTraining > 0):
             # print 'changing alpha (%.2f)and epsilon(%.2f)' % (self.alpha, self.epsilon)
@@ -802,40 +790,42 @@ class ReinforcementAgent:
 
     def observationFunction(self, gameState):
         """
-            This is where we ended up after our last action.
-            The simulation should somehow ensure this is called
+            Detects a change on the gameState, makes the reward calculations, and calls observeTransition()
         """
         if not self.lastState is None:
+            # If the score is less than the last turn, the reward is 0
             if((gameState.getScore() - self.lastScore) <= 0): 
                 reward = 0
-                # self.noRewardTurns = self.noRewardTurns + 1
-                # if self.noRewardTurns >= 500:
-                #     self.noRewardTurns = 0
-                #     self.epsilon = 0.5
             else:
+                # If the pacman eats a ghost without eating all the food, it doesn't get rewarded
                 if ((gameState.getScore() - self.lastScore) > 50 and gameState.getNumFood() > 0):
                     reward = 0
                 else:
                     reward = 0.25
-                self.noRewardTurns = 0
+            # The score of the previous turn is updated
             self.lastScore = gameState.getScore()
-
+            # We call observeTransition() to update the Q-table
             self.observeTransition(self.lastState, self.lastAction, gameState, reward)
+
         return gameState
 
     def observeTransition(self, gameState,action,nextGameState,reward):
         """
             Called by environment to inform agent that a transition has
-            been observed. This will result in a call to self.update
+            been observed. This will result in a call to update()
             on the same arguments
-            Do *not* override or call this function
         """
         self.update(gameState,action,nextGameState,reward)
 
     def getAction(self, gameState):
+        """
+            This function is called whenever the game requests an action
+        """
         posPacman = gameState.getPacmanPosition()
         state = self.getState(gameState)
         action = self.chooseAction(state, gameState)
+        # This is used to fix a pacman that got stuck
+        # If the pacman makes 5 reversed movements in a row, the next action will be random
         if self.epsilon == 0.0:
             if Actions.reverseDirection(action) == self.lastAction:
                 self.loopCounter = self.loopCounter + 1
@@ -852,8 +842,7 @@ class ReinforcementAgent:
 
     def doAction(self,state,action):
         """
-            Called by inherited class when
-            an action is taken in a state
+            This function updates the last state and action
         """
         self.lastState = state
         self.lastAction = action
@@ -888,12 +877,16 @@ class QLearningAgent(ReinforcementAgent):
             self.table_file.write("\n")
 
     def computePosition(self, state):
-        # pos = state[0][1] + state[1][1]*4 + state[2][1]*16 + state[3][1]*64
-        # pos = self.getNumberAction(state)
+        """
+            Translates the state into a number that can be used in the qtable
+        """
         pos = state[0]*8 + state[1]*4 + state[2]*2 + state[3]
         return pos
 
     def getNumberAction(self, action):
+        """
+            Translates the action received into a number that can be used in the qtable
+        """
         if action == 'North':
             action = 0
         elif action == 'East':
@@ -905,23 +898,24 @@ class QLearningAgent(ReinforcementAgent):
         return action
 
     def chooseAction(self, state, gameState):
-        global lastState
+        """
+            When this function is called, it returns an action from the set of best actions based on its qvalues
+        """
         legal = gameState.getLegalActions(0)
         if (len(legal) == 0):
             return None
-        lastState = gameState
         flip = util.flipCoin(self.epsilon)
 
         if flip:
-            last_action = random.choice(legal)
-            return last_action
-        last_action = self.computeActionFromQValues(state, gameState)
-        return last_action
+            return random.choice(legal)
+        
+        return self.computeActionFromQValues(state, gameState)
 
     def computeActionFromQValues(self, state, gameState):
-
+        """
+            Returns the best action in a state
+        """
         legal = gameState.getLegalActions(0)
-        
 
         best_actions = []
         best_value = -99999
@@ -948,7 +942,9 @@ class QLearningAgent(ReinforcementAgent):
         return max(self.q_table[self.computePosition(state)])
 
     def getQValue(self, state, action):
-
+        """
+            Returns the Qvalue of performing an action in a state
+        """
         position = self.computePosition(state)
         
         action_column = self.getNumberAction(action)
@@ -956,27 +952,16 @@ class QLearningAgent(ReinforcementAgent):
         return self.q_table[position][action_column]
 
     def update(self, gameState, action, nextGameState, reward):
+        """
+            Updates the q_table according to given guidelines
+        """
         state = self.getState(gameState)
         if state !=  None:
-            q_value = 0
+            # Calculates the position of the current state and action in the q_table
             pos = self.computePosition(state)
-
             action = self.getNumberAction(action)
 
-            # if  gameState.getNumAgents() -1 == 0:
-            #     q_value = ((1 - self.alpha) * self.q_table[pos][action]) + (self.alpha * reward)
-            # else:
-            #     # Se busca la posicion del proximo estado con computePosition()
-            #     posNext = self.computePosition(nextState)
-            #     # Obtenemos el mejor Q-value del estado actual, lo que determina la mejor accion.
-            #     max_a = self.computeValueFromQValues(nextState, gameState)
-            #     # Por ultimo, calculamos la siguiente accion, y su numero equivalente
-            #     nextAction = self.computeActionFromQValues(nextState, gameState)
-            #     nextAction = self.getNumberAction(nextAction)
-            #     # Se calcula el q-value actual con la siguiente formula
-            #     q_value = (1 - self.alpha) * self.q_table[pos][action] + (self.alpha * (reward + (self.discount * max_a * self.q_table[posNext][nextAction])))
-            # if(self.q_table[pos][action] != 0.0 or reward != 0):
-            #     q_value = 0
+            # Whenever the last ghost is eaten, the reward is 0.26 instead of 0.25, so we can identify the end of the game
             if(reward == 0.26):
                 q_value = ((1 - self.alpha) * self.q_table[pos][action]) + (self.alpha * reward)
             else:
@@ -984,42 +969,24 @@ class QLearningAgent(ReinforcementAgent):
                 if (nextState != None):
                     nextAction = self.getNumberAction(self.chooseAction(nextState, nextGameState))
                     posNext = self.computePosition(nextState)
-                    # if (self.q_table[posNext][nextAction] != 0.0):
-                    #     q_value = 0
+                    # If the state remains the same, and there is no reward, we don't edit the qvalue
                     if (state == nextState and reward == 0):
                         q_value = self.q_table[pos][action]
                     else:
                         q_value = (1 - self.alpha) * self.q_table[pos][action]
                         q_value += self.alpha * (reward + (self.discount * self.computeValueFromQValues(nextState, gameState) * self.q_table[posNext][nextAction]))
 
-            # Actualizamos la tabla de Q-values
+            # The Q-values table is updated
             self.q_table[pos][action] = q_value
-        # Escribimos los cambios en el archivo
+        # We write the changes into the file
         self.writeQtable()
 
-    def getPacmanPosition(self, posPacman, action):
-        buffPacman = 0,0
-        if action == 'North':
-            buffPacman = posPacman[0], posPacman[1] + 1
-        elif action == 'South':
-            buffPacman = posPacman[0], posPacman[1] - 1
-        elif action == "East":
-            buffPacman = posPacman[0] + 1, posPacman[1]
-        elif action == "West":
-            buffPacman = posPacman[0] - 1, posPacman[1]
-        return buffPacman
-
-    def getFuzzyDistance(self, distance):
-        if distance < 5:
-            return ['short', 0]
-        elif distance < 12:
-            return ['medium', 1]
-        elif distance < 70:
-            return ['long', 2]
-        else:
-            return ['illegal', 3]
 
     def checkIfMinDist(self, minDist, distances):
+        """
+            Given the minimum distance, and a list of distances, generates 
+            a list with binary values according to the needs of the state
+        """
         result = []
         for i in distances:
             if (minDist == i):
@@ -1030,50 +997,48 @@ class QLearningAgent(ReinforcementAgent):
 
 
     def final(self, state):
-
+        """
+            This function is called every time a game ends
+        """
+        # If the pacman doesn't eat something, the reward is 0. If it does, it gets rewarded with 0.26, since it is the last ghost
         if((state.getScore() - self.lastScore) <= 0): 
-            # if(minDist >= last_dist): reward = -0.01
-            # else:
-                reward = 0
-        # elif((gameState.getScore() - self.lastScore) < 50): reward = 0.25
+            reward = 0
         else: 
             reward = 0.26
-
+        # Updates the last score to keep track of the changes
         self.lastScore = state.getScore()
-
+        
         self.observeTransition(self.lastState, self.lastAction, state, reward)
         self.stopEpisode()
 
     def getState(self, gameState):
-        global last_dist
-        global minDist
-        # Almacenamos en variables una serie de datos relevantes
         legal = gameState.getLegalActions(0) ##Legal position from the pacman
-        # Por defecto, el movimiento a ejecutar es "Stop"
         if len(legal) == 0:
             return None
+        # By default, chooses a random movement as best
         bestMove = random.choice(legal)
         distNorth = 99999
         distSouth = 99999
         distEast = 99999
         distWest = 99999
+        minDist = 99999
 
         posPacman = gameState.getPacmanPosition()
 
-        minDist = 99999
+        
         walls = gameState.getWalls()
         livingGhosts = gameState.getLivingGhosts()
-        if livingGhosts.count(True) == 0:
-            return "TERMINAL_STATE"
         #move NORTH
         if Directions.NORTH in legal:
-            # Inicia un contador a 1 para no tener el cuenta el pacman
+            # Starts an iterator as 1 to ignore the pacman
             iterator = 1
-            # Almacena la posicion del pacman resultante de ejecutar la accion
+            # Stores in a buffer the resulting position of the pacman if it executed the given action
             buffPacman = posPacman[0], posPacman[1] + 1
-            # Comprueba que la casilla objetivo no contenga un muro
+            # Checks the target cell doesn't have a wall
             if walls[buffPacman[0]][buffPacman[1]] == False:
+                # If there is uneaten food, it takes priority over the ghosts
                 if gameState.getDistanceNearestFood() != None:
+                    # Searches for the distance to the nearest food
                     foodPos = gameState.getPositionNearestFood(buffPacman)
                     if self.distancer.getDistance(foodPos, buffPacman) < distNorth:
                         distNorth = self.distancer.getDistance(foodPos, buffPacman)
@@ -1094,13 +1059,15 @@ class QLearningAgent(ReinforcementAgent):
                         iterator = iterator + 1
         #move SOUTH
         if Directions.SOUTH in legal:
-            # Inicia un contador a 1 para no tener el cuenta el pacman
+            # Starts an iterator as 1 to ignore the pacman
             iterator = 1
-            # Almacena la posicion del pacman resultante de ejecutar la accion
+            # Stores in a buffer the resulting position of the pacman if it executed the given action
             buffPacman = posPacman[0], posPacman[1] - 1
-            # Comprueba que la casilla objetivo no contenga un muro
+            # Checks the target cell doesn't have a wall
             if walls[buffPacman[0]][buffPacman[1]] == False:
+                # If there is uneaten food, it takes priority over the ghosts
                 if gameState.getDistanceNearestFood() != None:
+                    # Searches for the distance to the nearest food
                     foodPos = gameState.getPositionNearestFood(buffPacman)
                     if self.distancer.getDistance(foodPos, buffPacman) < distSouth:
                         distSouth = self.distancer.getDistance(foodPos, buffPacman)
@@ -1122,13 +1089,15 @@ class QLearningAgent(ReinforcementAgent):
                         iterator = iterator + 1
         #move EAST
         if Directions.EAST in legal:
-            # Inicia un contador a 1 para no tener el cuenta el pacman
+            # Starts an iterator as 1 to ignore the pacman
             iterator = 1
-            # Almacena la posicion del pacman resultante de ejecutar la accion
+            # Stores in a buffer the resulting position of the pacman if it executed the given action
             buffPacman = posPacman[0] + 1, posPacman[1]
-            # Comprueba que la casilla objetivo no contenga un muro
+            # Checks the target cell doesn't have a wall
             if walls[buffPacman[0]][buffPacman[1]] == False:
+                # If there is uneaten food, it takes priority over the ghosts
                 if gameState.getDistanceNearestFood() != None:
+                    # Searches for the distance to the nearest food
                     foodPos = gameState.getPositionNearestFood(buffPacman)
                     if self.distancer.getDistance(foodPos, buffPacman) < distEast:
                         distEast = self.distancer.getDistance(foodPos, buffPacman)
@@ -1150,13 +1119,15 @@ class QLearningAgent(ReinforcementAgent):
                         iterator = iterator + 1
         #move WEST
         if Directions.WEST in legal:
-            # Inicia un contador a 1 para no tener el cuenta el pacman
+            # Starts an iterator as 1 to ignore the pacman
             iterator = 1
-            # Almacena la posicion del pacman resultante de ejecutar la accion
+            # Stores in a buffer the resulting position of the pacman if it executed the given action
             buffPacman = posPacman[0] - 1, posPacman[1]
-            # Comprueba que la casilla objetivo no contenga un muro
+            # Checks the target cell doesn't have a wall
             if walls[buffPacman[0]][buffPacman[1]] == False:
+                # If there is uneaten food, it takes priority over the ghosts
                 if gameState.getDistanceNearestFood() != None:
+                    # Searches for the distance to the nearest food
                     foodPos = gameState.getPositionNearestFood(buffPacman)
                     if self.distancer.getDistance(foodPos, buffPacman) < distWest:
                         distWest = self.distancer.getDistance(foodPos, buffPacman)
@@ -1177,18 +1148,9 @@ class QLearningAgent(ReinforcementAgent):
                                     bestMove = Directions.WEST
                         iterator = iterator + 1
 
+        # Stores all the distances in a list, that will be passed to a function to create the state
         result = [distNorth, distSouth, distEast, distWest]
         state = self.checkIfMinDist(minDist, result)
-
-
-        # distNorth = self.getFuzzyDistance(distNorth)
-        # distSouth = self.getFuzzyDistance(distSouth)
-        # distEast = self.getFuzzyDistance(distEast)
-        # distWest = self.getFuzzyDistance(distWest)
-        # state = distNorth, distSouth, distEast, distWest
-
-
-        # state = bestMove
 
         return state
 
