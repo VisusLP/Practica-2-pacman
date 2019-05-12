@@ -1005,7 +1005,7 @@ class QLearningAgent(ReinforcementAgent):
         if((state.getScore() - self.lastScore) <= 0): 
             reward = 0
         else:
-            if ((gameState.getScore() - self.lastScore) > 50 and gameState.getNumFood() > 0):
+            if ((state.getScore() - self.lastScore) > 50 and state.getNumFood() > 0):
                 reward = 0
             else:
                 reward = 0.26
