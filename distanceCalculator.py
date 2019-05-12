@@ -132,7 +132,7 @@ class DistanceCalculator(threading.Thread):
       distanceThread = self
 
       distances = computeDistances(self.layout)
-      print >>sys.stdout, '[Distancer]: Switching to maze distances'
+      #print >>sys.stdout, '[Distancer]: Switching to maze distances'
 
       distanceMap[self.layout.walls] = distances
       distanceThread = None

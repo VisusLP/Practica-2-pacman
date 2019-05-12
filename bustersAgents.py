@@ -976,9 +976,12 @@ class QLearningAgent(ReinforcementAgent):
                     else:
                         q_value = (1 - self.alpha) * self.q_table[pos][action]
                         q_value += self.alpha * (reward + (self.discount * self.computeValueFromQValues(nextState, gameState) * self.q_table[posNext][nextAction]))
-
-            # The Q-values table is updated
-            self.q_table[pos][action] = q_value
+                else:
+                    q_value = self.q_table[pos][action]
+        else:
+            q_value = self.q_table[pos][action]
+        # The Q-values table is updated
+        self.q_table[pos][action] = q_value
         # We write the changes into the file
         self.writeQtable()
 
