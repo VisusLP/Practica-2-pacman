@@ -70,3 +70,9 @@ Se hará uso de los argumentos -e y -r para eliminar movimientos aleatorios y ev
 $python busters.py -p QLearningAgent -l originalClassic -n 100 -r 0 -e 0 -q
 ```
 Al acabar, se mostrarán en pantalla las estadísticas de la partida.
+
+## Scripts
+
+Los scripts utilizados se encuentran en la carpeta [Scripts](Scripts) por temas de organización. No obstante, es necesario extraer a la carpeta raíz todo script que quiera ser ejecutado
+
+Algunos scripts se han dejado en la carpeta raíz para permitir un fácil acceso a la ejecución del programa.
