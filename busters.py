@@ -676,7 +676,10 @@ def runGames( layout, pacman, ghosts, display, numGames, maxMoves=5000, numTrain
         if(noOutput or quiet):
             # The program will print an update on the progress if there isn't graphical output
             if((i % updateEpisodes) == 0 and i != 0):
-                print 'Completed %d out of %d training episodes' % (i, numTraining)
+                if (numTraining > 0):
+                    print 'Completed %d out of %d training episodes' % (i, numTraining)
+                else:
+                    print 'Completed %d out of %d episodes' % (i, numGames)
             # The program will use the NullGraphics function to not print anything
             import textDisplay
             display = textDisplay.NullGraphics()
@@ -691,8 +694,12 @@ def runGames( layout, pacman, ghosts, display, numGames, maxMoves=5000, numTrain
         # We only add to the game history games that aren't in the training session
         if not noOutput: games.append(game)
         # If this is the last game of the training session, it prints a message informing the user
-        if (i == numTraining - 1 or i == numGames - 1):
-            print 'Completed %d out of %d training episodes' % (i+1, numTraining)
+        if (numTraining > 0):
+            if (i == numTraining - 1 or i == numGames - 1):
+                print 'Completed %d out of %d training episodes' % (i+1, numTraining)
+        else:
+            if(i == numGames - 1):
+                print 'Completed %d out of %d episodes' % (i+1, numGames)
 
     if (numGames-numTraining) > 0:
         scores = [game.state.getScore() for game in games]
