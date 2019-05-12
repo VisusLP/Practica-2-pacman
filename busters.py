@@ -661,7 +661,10 @@ def runGames( layout, pacman, ghosts, display, numGames, maxMoves=5000, numTrain
 
     # If we are in a training session, we will print a message every tenth of the way progressed
     # In case the number of training games is less than 10, we will print it every game
-    updateEpisodes = (int)(numTraining / 10)
+    if (numTraining > 0):
+        updateEpisodes = (int)(numTraining / 10)
+    else:
+        updateEpisodes = (int)(numGames / 10)
     if updateEpisodes == 0:
         updateEpisodes = 1
     # If the argument -q has been used, the game will generate no graphical output
