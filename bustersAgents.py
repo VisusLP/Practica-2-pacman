@@ -822,7 +822,6 @@ class ReinforcementAgent:
         """
             This function is called whenever the game requests an action
         """
-        posPacman = gameState.getPacmanPosition()
         state = self.getState(gameState)
         action = self.chooseAction(state, gameState)
         # This is used to fix a pacman that got stuck
@@ -831,6 +830,7 @@ class ReinforcementAgent:
             if Actions.reverseDirection(action) == self.lastAction:
                 self.loopCounter = self.loopCounter + 1
             else:
+                # The pacman has made a non reverse action, so the value of loopCounter is set to 0
                 self.loopCounter = 0
             if self.loopCounter >= 5:
                 # print 'Unstucking'

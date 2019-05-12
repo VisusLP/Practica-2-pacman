@@ -703,7 +703,12 @@ def runGames( layout, pacman, ghosts, display, numGames, maxMoves=5000, numTrain
 
     if (numGames-numTraining) > 0:
         scores = [game.state.getScore() for game in games]
-        wins = [game.state.isWin() for game in games]
+        wins = []
+        for game in games:
+            if(game.state.isWin()):
+                wins.append(True)
+            else:
+                wins.append(False)
         winRate = wins.count(True)/ float(len(wins))
         avgMoves = [game.state.getNumMoves() for game in games]
         movesBuff = avgMoves
