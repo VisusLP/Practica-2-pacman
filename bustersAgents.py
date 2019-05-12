@@ -1004,8 +1004,11 @@ class QLearningAgent(ReinforcementAgent):
         # If the pacman doesn't eat something, the reward is 0. If it does, it gets rewarded with 0.26, since it is the last ghost
         if((state.getScore() - self.lastScore) <= 0): 
             reward = 0
-        else: 
-            reward = 0.26
+        else:
+            if ((gameState.getScore() - self.lastScore) > 50 and gameState.getNumFood() > 0):
+                reward = 0
+            else:
+                reward = 0.26
         # Updates the last score to keep track of the changes
         self.lastScore = state.getScore()
         
@@ -1017,7 +1020,6 @@ class QLearningAgent(ReinforcementAgent):
         if len(legal) == 0:
             return None
         # By default, chooses a random movement as best
-        bestMove = random.choice(legal)
         distNorth = 99999
         distSouth = 99999
         distEast = 99999
@@ -1045,7 +1047,6 @@ class QLearningAgent(ReinforcementAgent):
                         distNorth = self.distancer.getDistance(foodPos, buffPacman)
                         if distNorth < minDist:
                             minDist = distNorth
-                            bestMove = Directions.NORTH
                 else:
                     # Itera sobre los fantasmas
                     for x in gameState.getGhostPositions():
@@ -1056,7 +1057,6 @@ class QLearningAgent(ReinforcementAgent):
                                 distNorth = self.distancer.getDistance(x, buffPacman)
                                 if distNorth < minDist:
                                     minDist = distNorth
-                                    bestMove = Directions.NORTH
                         iterator = iterator + 1
         #move SOUTH
         if Directions.SOUTH in legal:
@@ -1074,7 +1074,6 @@ class QLearningAgent(ReinforcementAgent):
                         distSouth = self.distancer.getDistance(foodPos, buffPacman)
                         if distSouth < minDist:
                             minDist = distSouth
-                            bestMove = Directions.SOUTH
                 else:
                     # Itera sobre los fantasmas
                     for x in gameState.getGhostPositions():
@@ -1086,7 +1085,6 @@ class QLearningAgent(ReinforcementAgent):
                                 if distSouth < minDist:
                                     # Se sobreescribe y se cambia el movimiento a realizar
                                     minDist = distSouth
-                                    bestMove = Directions.SOUTH
                         iterator = iterator + 1
         #move EAST
         if Directions.EAST in legal:
@@ -1104,7 +1102,6 @@ class QLearningAgent(ReinforcementAgent):
                         distEast = self.distancer.getDistance(foodPos, buffPacman)
                         if distEast < minDist:
                             minDist = distEast
-                            bestMove = Directions.EAST
                 else:
                     # Itera sobre los fantasmas
                     for x in gameState.getGhostPositions():
@@ -1116,7 +1113,6 @@ class QLearningAgent(ReinforcementAgent):
                                 if distEast < minDist:
                                     # Se sobreescribe y se cambia el movimiento a realizar
                                     minDist = distEast
-                                    bestMove = Directions.EAST
                         iterator = iterator + 1
         #move WEST
         if Directions.WEST in legal:
@@ -1134,7 +1130,6 @@ class QLearningAgent(ReinforcementAgent):
                         distWest = self.distancer.getDistance(foodPos, buffPacman)
                         if distWest < minDist:
                             minDist = distWest
-                            bestMove = Directions.WEST
                 else:
                     # Itera sobre los fantasmas
                     for x in gameState.getGhostPositions():
@@ -1146,7 +1141,6 @@ class QLearningAgent(ReinforcementAgent):
                                 if distWest < minDist:
                                     # Se sobreescribe y se cambia el movimiento a realizar
                                     minDist = distWest
-                                    bestMove = Directions.WEST
                         iterator = iterator + 1
 
         # Stores all the distances in a list, that will be passed to a function to create the state
