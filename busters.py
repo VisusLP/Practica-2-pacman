@@ -714,7 +714,7 @@ def runGames( layout, pacman, ghosts, display, numGames, maxMoves=5000, numTrain
         print 'Record:            ', ', '.join([ ['Loss', 'Win'][int(w)] for w in wins])
         print 'Average Moves:     ', sum(avgMoves)/float(len(avgMoves))
         print 'Moves:             ', ', '.join([str(avgMoves) for avgMoves in avgMoves])
-
+        print '\n\n\n'
         # Esta parte sirve para almacenar los datos de partidas jugadas en un archivo a definir
         """ result = open("Results/Game history.txt", "a")
         result.write("PLAYING IN MAP:     %s\n" % layoutName)
