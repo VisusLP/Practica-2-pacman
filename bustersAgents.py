@@ -1027,7 +1027,7 @@ class QLearningAgent(ReinforcementAgent):
         distSouth = 99999
         distEast = 99999
         distWest = 99999
-        minDist = 99999
+        minDist = 99998
 
         posPacman = gameState.getPacmanPosition()
 
