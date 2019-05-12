@@ -53,7 +53,7 @@ $python busters.py -p QLearningAgent -k 3 -l labAA3 -n 10 -x 10 &&
 $python busters.py -p QLearningAgent -k 3 -l labAA4 -n 10 -x 10 &&
 $python busters.py -p QLearningAgent -k 3 -l labAA5 -n 10 -x 10
 ```
-En caso de querer hacer un entrenamiento intensivo, se ejecutarán más episodios de entrenamiento:
+En caso de querer hacer un entrenamiento intensivo, se ejecutarán más episodios de entrenamiento: (RECOMENDADO!)
 ```
 $python busters.py -p QLearningAgent -k 1 -l labAA1 -n 100 -x 100 &&
 $python busters.py -p QLearningAgent -k 2 -l labAA2 -n 100 -x 100 &&
